@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cabinet Door Cut Planner (Visual + Print)</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#111827; --muted:#94a3b8; --text:#e5e7eb;
+    --accent:#22d3ee; --ok:#4ade80; --warn:#f59e0b; --bad:#f87171;
+    --card:#0b1220; --line:#334155;
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0; font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+       color:var(--text); background:linear-gradient(180deg,#0b1220,#0f172a 40%)}
+  header{padding:16px 20px; border-bottom:1px solid var(--line); display:flex; gap:16px;
+         align-items:center; justify-content:space-between; position:sticky; top:0;
+         background:rgba(11,18,32,.85); backdrop-filter:blur(6px)}
+  h1{margin:0; font-size:18px}
+  .wrap{display:grid; grid-template-columns:350px 1fr; gap:16px; padding:16px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .card h2{margin:0; padding:10px 14px; border-bottom:1px solid var(--line); font-size:15px; color:#cbd5e1}
+  .card .content{padding:12px 14px}
+  label{display:block; font-size:12px; color:var(--muted); margin-top:8px}
+  input,select,button{font:inherit; color:var(--text)}
+  input[type=number],input[type=text],select{width:100%; padding:8px 10px; border:1px solid var(--line); background:#0b1220; border-radius:8px; outline:none}
+  input[type=number]:focus,select:focus{border-color:var(--accent); box-shadow:0 0 0 2px rgba(34,211,238,.15)}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+  .btn{background:linear-gradient(180deg,#1f2937,#0f172a); border:1px solid var(--line); color:#e2e8f0; padding:8px 12px; border-radius:8px; cursor:pointer}
+  .btn:hover{border-color:var(--accent); color:#fff} .btn.primary{background:linear-gradient(180deg,#0891b2,#155e75); border-color:#0ea5b3}
+  .tag{display:inline-block; padding:2px 8px; border-radius:999px; background:#0b1220; border:1px solid var(--line); color:#cbd5e1}
+  table{width:100%; border-collapse:collapse; font-size:13px} th,td{padding:8px 10px; border-bottom:1px solid var(--line)} th{color:#cbd5e1; text-align:left; background:#0b1220; position:sticky; top:0}
+  .flex{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .boards{display:grid; gap:14px}
+  .board{background:#0b1220; border:1px dashed var(--line); padding:10px; border-radius:10px}
+  .board h3{margin:0 0 8px 0; font-size:13px; color:#cbd5e1}
+  .svgwrap{width:100%; overflow:auto; background:linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px) 0 0 / 40px 100%}
+  svg{width:100%; height:auto}
+  .cutRect{fill:#1f2937; stroke:#22d3ee; stroke-width:1.5}
+  .cutLabel{fill:#d1d5db; font-size:10px}
+  .kerf{stroke:#f59e0b; stroke-dasharray:3 3}
+  .waste{fill:#0a0f1a; stroke:#334155; stroke-dasharray:2 2}
+  .door-diagram{background:#0b1220; border:1px solid var(--line); border-radius:10px; padding:15px; margin:10px 0}
+  .door-diagram h4{margin:0 0 10px 0; color:#cbd5e1; font-size:14px}
+  .unit-input{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center}
+  .unit-display{font-size:11px; color:var(--muted); min-width:60px; text-align:right}
+  .door-svg{background:#0a0f1a; border-radius:8px; padding:10px}
+  .door-outline{fill:none; stroke:#22d3ee; stroke-width:2}
+  .door-component{fill:none; stroke:#4ade80; stroke-width:1.5}
+  .door-label{fill:#d1d5db; font-size:11px; font-weight:bold}
+  .door-dimension{fill:#f59e0b; font-size:10px}
+  .dimension-line{stroke:#f59e0b; stroke-width:1; stroke-dasharray:2 2}
+  .rightCol{display:grid; grid-template-rows:auto auto 1fr; gap:16px; min-height:0}
+  .stickyButtons{display:flex; gap:8px; align-items:center}
+  @media print{
+    * { 
+      -webkit-print-color-adjust: exact !important; 
+      color-adjust: exact !important; 
+      background: white !important;
+      color: black !important;
+    }
+    body{background:#fff !important; color:#000 !important; margin:0; padding:20px}
+    .wrap{display:block} 
+    .card{break-inside:avoid; page-break-inside:avoid; margin-bottom:20px; border:1px solid #ccc; padding:15px; background:white !important}
+    .svgwrap{background:none !important} 
+    .cutLabel{font-size:9px; fill:#000 !important}
+    .cutRect{fill:#fff !important; stroke:#000 !important} 
+    .waste{fill:#fff !important; stroke:#888 !important} 
+    .kerf{stroke:#888 !important}
+    .door-diagram{page-break-inside:avoid; page-break-after:always; margin-bottom:30px; background:white !important}
+    .door-svg{background:white !important}
+    .board{page-break-inside:avoid; background:white !important}
+    table{page-break-inside:avoid; width:100%; margin-bottom:20px; background:white !important}
+    tr{page-break-inside:avoid; background:white !important}
+    th{background:white !important; color:black !important}
+    td{background:white !important; color:black !important}
+    .door-svg{display:none}
+    .board svg{display:block !important}
+    .svgwrap svg{display:block !important}
+    .opening-info{background:#f5f5f5 !important; padding:10px; margin-bottom:15px; border:1px solid #ccc}
+    .opening-info h3{margin:0 0 10px 0; font-size:16px; color:black !important}
+    .opening-details{display:grid; grid-template-columns:1fr 1fr; gap:15px; font-size:12px; color:black !important}
+    h1,h2,h3,h4,h5,h6{color:black !important}
+    p,div,span{color:black !important}
+    
+    /* Landscape ONLY for board layouts - proper print styles */
+    .board{page-break-before:always; page-break-after:always}
+    .board svg{page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="flex">
+    <h1>Cabinet Door Cut Planner</h1><span class="tag">Visual + Print</span>
+  </div>
+  <div class="stickyButtons">
+    <button class="btn" id="btnExportCSV">Export CSV</button>
+    <button class="btn" id="btnExportJSON">Export JSON</button>
+    <button class="btn primary" onclick="window.print()">Print</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Fixed Parameters</h2>
+    <div class="content">
+      <div class="row">
+        <div>
+          <label>Primary Units</label>
+          <select id="units"><option value="mm" selected>mm</option><option value="in">inches</option></select>
+        </div>
+        <div>
+          <label>Hinge cup inset (informational)</label>
+          <div class="unit-input">
+            <input type="number" id="hingeCupInset" value="5" step="0.1">
+            <div class="unit-display" id="hingeCupInsetDisplay">5.0 mm</div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Side overlay (per side)</label>
+          <div class="unit-input">
+            <input type="number" id="sideOverlay" value="14" step="0.1">
+            <div class="unit-display" id="sideOverlayDisplay">14.0 mm</div>
+          </div>
+        </div>
+        <div>
+          <label>Top/Bottom overlay (per side)</label>
+          <div class="unit-input">
+            <input type="number" id="topBottomOverlay" value="14" step="0.1">
+            <div class="unit-display" id="topBottomOverlayDisplay">14.0 mm</div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Center gap (double doors)</label>
+          <div class="unit-input">
+            <input type="number" id="centerGap" value="3" step="0.1">
+            <div class="unit-display" id="centerGapDisplay">3.0 mm</div>
+          </div>
+        </div>
+        <div>
+          <label>Panel allowance (total per dimension)</label>
+          <div class="unit-input">
+            <input type="number" id="panelAllowance" value="0.8" step="0.1">
+            <div class="unit-display" id="panelAllowanceDisplay">0.8 mm</div>
+          </div>
+        </div>
+      </div>
+      <hr style="border-color:#334155; margin:10px 0">
+      <div class="row">
+        <div>
+          <label>Stile width</label>
+          <div class="unit-input">
+            <input type="number" id="stileWidth" value="63" step="0.1">
+            <div class="unit-display" id="stileWidthDisplay">63.0 mm</div>
+          </div>
+        </div>
+        <div>
+          <label>Top rail width</label>
+          <div class="unit-input">
+            <input type="number" id="topRailWidth" value="63" step="0.1">
+            <div class="unit-display" id="topRailWidthDisplay">63.0 mm</div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Bottom rail width</label>
+          <div class="unit-input">
+            <input type="number" id="bottomRailWidth" value="89" step="0.1">
+            <div class="unit-display" id="bottomRailWidthDisplay">89.0 mm</div>
+          </div>
+        </div>
+        <div>
+          <label>Tongue length (into groove)</label>
+          <div class="unit-input">
+            <input type="number" id="tongueLength" value="12.7" step="0.1">
+            <div class="unit-display" id="tongueLengthDisplay">12.7 mm</div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Groove depth</label>
+          <div class="unit-input">
+            <input type="number" id="grooveDepth" value="12.7" step="0.1">
+            <div class="unit-display" id="grooveDepthDisplay">12.7 mm</div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+      <hr style="border-color:#334155; margin:10px 0">
+      <div class="row">
+        <div>
+          <label>Kerf</label>
+          <div class="unit-input">
+            <input type="number" id="kerf" value="3.2" step="0.1">
+            <div class="unit-display" id="kerfDisplay">3.2 mm</div>
+          </div>
+        </div>
+        <div>
+          <label>End trim per board</label>
+          <div class="unit-input">
+            <input type="number" id="endTrim" value="25" step="0.1">
+            <div class="unit-display" id="endTrimDisplay">25.0 mm</div>
+          </div>
+        </div>
+      </div>
+      <label>Stock lengths (comma-separated)</label>
+      <input type="text" id="stockLengths" value="1829,2438">
+      
+      <div class="row">
+        <div>
+          <label>Existing 6ft (1829mm) boards - 63mm wide</label>
+          <input type="number" id="existing6ft63" value="0" min="0">
+        </div>
+        <div>
+          <label>Existing 8ft (2438mm) boards - 63mm wide</label>
+          <input type="number" id="existing8ft63" value="0" min="0">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Existing 6ft (1829mm) boards - 89mm wide</label>
+          <input type="number" id="existing6ft89" value="0" min="0">
+        </div>
+        <div>
+          <label>Existing 8ft (2438mm) boards - 89mm wide</label>
+          <input type="number" id="existing8ft89" value="0" min="0">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rightCol">
+    <div class="card">
+      <h2>Openings <span class="muted small">Add one row per cabinet opening</span></h2>
+      <div class="content">
+        <div class="flex" style="justify-content:space-between; margin-bottom:8px">
+          <button class="btn" id="btnAddOpening">+ Add Opening</button>
+          <div class="muted small">Widths/Heights are cabinet openings (not door sizes)</div>
+        </div>
+        <div id="openingsTable"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Door Construction Visual</h2>
+      <div class="content">
+        <div id="doorDiagrams"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Cut List</h2>
+      <div class="content"><div id="cutListTable"></div></div>
+    </div>
+
+    <div class="card">
+      <h2>Board Layout</h2>
+      <div class="content boards" id="boardsWrap"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const mmPerInch=25.4; const $=(s)=>document.querySelector(s); const $$=(s)=>Array.from(document.querySelectorAll(s));
+function uid(){return Math.random().toString(36).slice(2)}
+function parseNumsCSV(s){return s.split(',').map(v=>parseFloat(v.trim())).filter(v=>!isNaN(v)&&v>0)}
+function fmt(n,u){return u==='mm'?n.toFixed(1):n.toFixed(3)}
+
+let params={units:'mm',hingeCupInset:5,sideOverlay:14,topBottomOverlay:14,centerGap:3,panelAllowance:0.8,
+            stileWidth:63,topRailWidth:63,bottomRailWidth:89,tongueLength:12.7,grooveDepth:12.7,
+            kerf:3.2,endTrim:25,stockLengths:[1829,2438],existing6ft63:0,existing8ft63:0,existing6ft89:0,existing8ft89:0};
+
+let openings=[{id:uid(),name:'Base - Sink',width:762,height:610,doors:2},
+              {id:uid(),name:'Upper - Left',width:381,height:762,doors:1}];
+
+function readParams(){
+  params.units=$('#units').value;
+  params.hingeCupInset=parseFloat($('#hingeCupInset').value)||0;
+  params.sideOverlay=parseFloat($('#sideOverlay').value)||0;
+  params.topBottomOverlay=parseFloat($('#topBottomOverlay').value)||0;
+  params.centerGap=parseFloat($('#centerGap').value)||0;
+  params.panelAllowance=parseFloat($('#panelAllowance').value)||0;
+  params.stileWidth=parseFloat($('#stileWidth').value)||0;
+  params.topRailWidth=parseFloat($('#topRailWidth').value)||0;
+  params.bottomRailWidth=parseFloat($('#bottomRailWidth').value)||0;
+  params.tongueLength=parseFloat($('#tongueLength').value)||0;
+  params.grooveDepth=parseFloat($('#grooveDepth').value)||0;
+  params.kerf=parseFloat($('#kerf').value)||0;
+  params.endTrim=parseFloat($('#endTrim').value)||0;
+  params.stockLengths=parseNumsCSV($('#stockLengths').value);
+  params.existing6ft63=parseInt($('#existing6ft63').value)||0;
+  params.existing8ft63=parseInt($('#existing8ft63').value)||0;
+  params.existing6ft89=parseInt($('#existing6ft89').value)||0;
+  params.existing8ft89=parseInt($('#existing8ft89').value)||0;
+}
+
+function updateUnitDisplays(){
+  const units=params.units;
+  const factor=(units==='mm')?1:(1/mmPerInch);
+  
+  const displays=[
+    {id:'hingeCupInsetDisplay', value:params.hingeCupInset},
+    {id:'sideOverlayDisplay', value:params.sideOverlay},
+    {id:'topBottomOverlayDisplay', value:params.topBottomOverlay},
+    {id:'centerGapDisplay', value:params.centerGap},
+    {id:'panelAllowanceDisplay', value:params.panelAllowance},
+    {id:'stileWidthDisplay', value:params.stileWidth},
+    {id:'topRailWidthDisplay', value:params.topRailWidth},
+    {id:'bottomRailWidthDisplay', value:params.bottomRailWidth},
+    {id:'tongueLengthDisplay', value:params.tongueLength},
+    {id:'grooveDepthDisplay', value:params.grooveDepth},
+    {id:'kerfDisplay', value:params.kerf},
+    {id:'endTrimDisplay', value:params.endTrim}
+  ];
+  
+  displays.forEach(d=>{
+    const el=$(`#${d.id}`);
+    if(el) el.textContent=`${fmt(d.value*factor, units)} ${units}`;
+  });
+  
+  // Update opening table unit displays
+  $$('#openingsTable [data-key="widthDisplay"], #openingsTable [data-key="heightDisplay"]').forEach(el=>{
+    const id=el.getAttribute('data-id');
+    const key=el.getAttribute('data-key');
+    const row=openings.find(o=>o.id===id);
+    if(row){
+      const valueKey=key.replace('Display','');
+      el.textContent=`${fmt(row[valueKey]*factor, units)} ${units}`;
+    }
+  });
+}
+
+function createDoorDiagram(opening){
+  const P=params; const units=P.units; const factor=(units==='mm')?1:(1/mmPerInch);
+  const OW=opening.width, OH=opening.height, doors=opening.doors;
+  const OS=P.sideOverlay, OT=P.topBottomOverlay, CG=P.centerGap;
+  const Wst=P.stileWidth, Wtop=P.topRailWidth, Wbot=P.bottomRailWidth;
+  const T=P.tongueLength, D=P.grooveDepth, A=P.panelAllowance;
+  
+  const DW = (doors===1) ? (OW+2*OS) : (OW+2*OS-CG)/2;
+  const DH = OH + 2*OT;
+  const stileLen=DH;
+  const railLenTop = DW - 2*Wst + 2*T;
+  const railLenBot = DW - 2*Wst + 2*T;
+  const panelW = DW - 2*(Wst - D) - A;
+  const panelH = DH - ((Wtop - D) + (Wbot - D)) - A;
+  
+  const diagram=document.createElement('div');
+  diagram.className='door-diagram';
+  
+  const h4=document.createElement('h4');
+  h4.textContent=`${opening.name} - ${doors} door${doors>1?'s':''} (Exploded View)`;
+  diagram.appendChild(h4);
+  
+  // Add cabinet opening information
+  const openingInfo=document.createElement('div');
+  openingInfo.className='opening-info';
+  openingInfo.innerHTML=`
+    <h3>Cabinet Opening: ${opening.name}</h3>
+    <div class="opening-details">
+      <div><strong>Opening Width:</strong> ${fmt(OW*factor, units)} ${units}</div>
+      <div><strong>Opening Height:</strong> ${fmt(OH*factor, units)} ${units}</div>
+      <div><strong>Number of Doors:</strong> ${doors}</div>
+      <div><strong>Door Width:</strong> ${fmt(DW*factor, units)} ${units}</div>
+    </div>
+  `;
+  diagram.appendChild(openingInfo);
+  
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 500 400');
+  svg.setAttribute('preserveAspectRatio','xMinYMin meet');
+  svg.className='door-svg';
+  
+  // Scale factor for drawing
+  const scale=Math.min(300/DW, 200/DH);
+  const centerX=250, centerY=200;
+  
+  // Calculate positions for exploded view
+  const panelX = centerX - panelW*scale/2;
+  const panelY = centerY - panelH*scale/2;
+  
+  // Left stile (exploded left)
+  const leftStileX = panelX - Wst*scale - 20;
+  const leftStileY = centerY - DH*scale/2;
+  
+  // Right stile (exploded right)
+  const rightStileX = panelX + panelW*scale + 20;
+  const rightStileY = centerY - DH*scale/2;
+  
+  // Top rail (exploded up)
+  const topRailX = panelX;
+  const topRailY = panelY - Wtop*scale - 20;
+  
+  // Bottom rail (exploded down)
+  const bottomRailX = panelX;
+  const bottomRailY = panelY + panelH*scale + 20;
+  
+  // Draw panel (center)
+  const panel=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  panel.setAttribute('x',panelX); panel.setAttribute('y',panelY);
+  panel.setAttribute('width',panelW*scale); panel.setAttribute('height',panelH*scale);
+  panel.setAttribute('fill','rgba(34,211,238,0.1)'); panel.setAttribute('stroke','#22d3ee');
+  panel.setAttribute('stroke-width','2');
+  svg.appendChild(panel);
+  
+  // Draw left stile
+  const leftStile=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  leftStile.setAttribute('x',leftStileX); leftStile.setAttribute('y',leftStileY);
+  leftStile.setAttribute('width',Wst*scale); leftStile.setAttribute('height',DH*scale);
+  leftStile.setAttribute('fill','rgba(74,222,128,0.1)'); leftStile.setAttribute('stroke','#4ade80');
+  leftStile.setAttribute('stroke-width','2');
+  svg.appendChild(leftStile);
+  
+  // Draw right stile
+  const rightStile=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  rightStile.setAttribute('x',rightStileX); rightStile.setAttribute('y',rightStileY);
+  rightStile.setAttribute('width',Wst*scale); rightStile.setAttribute('height',DH*scale);
+  rightStile.setAttribute('fill','rgba(74,222,128,0.1)'); rightStile.setAttribute('stroke','#4ade80');
+  rightStile.setAttribute('stroke-width','2');
+  svg.appendChild(rightStile);
+  
+  // Draw top rail
+  const topRail=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  topRail.setAttribute('x',topRailX); topRail.setAttribute('y',topRailY);
+  topRail.setAttribute('width',railLenTop*scale); topRail.setAttribute('height',Wtop*scale);
+  topRail.setAttribute('fill','rgba(74,222,128,0.1)'); topRail.setAttribute('stroke','#4ade80');
+  topRail.setAttribute('stroke-width','2');
+  svg.appendChild(topRail);
+  
+  // Draw bottom rail
+  const bottomRail=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bottomRail.setAttribute('x',bottomRailX); bottomRail.setAttribute('y',bottomRailY);
+  bottomRail.setAttribute('width',railLenBot*scale); bottomRail.setAttribute('height',Wbot*scale);
+  bottomRail.setAttribute('fill','rgba(74,222,128,0.1)'); bottomRail.setAttribute('stroke','#4ade80');
+  bottomRail.setAttribute('stroke-width','2');
+  svg.appendChild(bottomRail);
+  
+  // Clean blueprint style - no component labels, only essential dimensions
+  
+  // Add dimension lines (blueprint style)
+  const dimensionLines=[
+    // Left stile WIDTH dimension (horizontal - board stock width)
+    {x1:leftStileX, y1:leftStileY - 20, x2:leftStileX + Wst*scale, y2:leftStileY - 20,
+     x3:leftStileX + Wst*scale/2, y3:leftStileY - 30, label:`${fmt(Wst*factor, units)} ${units}`, vertical:false},
+    
+    // Left stile LENGTH dimension (vertical - along the left edge)
+    {x1:leftStileX - 35, y1:leftStileY, x2:leftStileX - 35, y2:leftStileY + DH*scale, 
+     x3:leftStileX - 45, y3:leftStileY + DH*scale/2, label:`${fmt(stileLen*factor, units)} ${units}`, vertical:true},
+    
+    // Bottom rail HEIGHT dimension (vertical - board stock width)
+    {x1:bottomRailX - 20, y1:bottomRailY, x2:bottomRailX - 20, y2:bottomRailY + Wbot*scale,
+     x3:bottomRailX - 30, y3:bottomRailY + Wbot*scale/2, label:`${fmt(Wbot*factor, units)} ${units}`, vertical:true},
+    
+    // Bottom rail LENGTH dimension (horizontal - along the bottom edge)
+    {x1:bottomRailX, y1:bottomRailY + Wbot*scale + 35, x2:bottomRailX + railLenBot*scale, y2:bottomRailY + Wbot*scale + 35,
+     x3:bottomRailX + railLenBot*scale/2, y3:bottomRailY + Wbot*scale + 45, label:`${fmt(railLenBot*factor, units)} ${units}`, vertical:false},
+    
+    // Panel width dimension (inside panel - moved to top third)
+    {x1:panelX + 5, y1:panelY + panelH*scale/3, x2:panelX + panelW*scale - 5, y2:panelY + panelH*scale/3,
+     x3:panelX + panelW*scale/2, y3:panelY + panelH*scale/3, label:`${fmt(panelW*factor, units)} ${units}`, vertical:false, inside:true},
+    
+    // Panel height dimension (inside panel)
+    {x1:panelX + panelW*scale/2, y1:panelY + 5, x2:panelX + panelW*scale/2, y2:panelY + panelH*scale - 5,
+     x3:panelX + panelW*scale/2, y3:panelY + panelH*scale/2, label:`${fmt(panelH*factor, units)} ${units}`, vertical:true, inside:true}
+  ];
+  
+  dimensionLines.forEach(dim=>{
+    // Witness marks (extension lines) - short lines extending from components (skip for inside panel dimensions)
+    if(!dim.inside){
+      const witness1=document.createElementNS('http://www.w3.org/2000/svg','line');
+      if(dim.vertical){
+        // Vertical dimension - witness marks extend horizontally from component edges
+        witness1.setAttribute('x1',dim.x1 + 10); witness1.setAttribute('y1',dim.y1);
+        witness1.setAttribute('x2',dim.x1); witness1.setAttribute('y2',dim.y1);
+      } else {
+        // Horizontal dimension - witness marks extend vertically from component edges
+        witness1.setAttribute('x1',dim.x1); witness1.setAttribute('y1',dim.y1 - 10);
+        witness1.setAttribute('x2',dim.x1); witness1.setAttribute('y2',dim.y1);
+      }
+      witness1.setAttribute('stroke','#d1d5db'); witness1.setAttribute('stroke-width','1');
+      svg.appendChild(witness1);
+      
+      const witness2=document.createElementNS('http://www.w3.org/2000/svg','line');
+      if(dim.vertical){
+        // Vertical dimension - witness marks extend horizontally from component edges
+        witness2.setAttribute('x1',dim.x2 + 10); witness2.setAttribute('y1',dim.y2);
+        witness2.setAttribute('x2',dim.x2); witness2.setAttribute('y2',dim.y2);
+      } else {
+        // Horizontal dimension - witness marks extend vertically from component edges
+        witness2.setAttribute('x1',dim.x2); witness2.setAttribute('y1',dim.y2 + 10);
+        witness2.setAttribute('x2',dim.x2); witness2.setAttribute('y2',dim.y2);
+      }
+      witness2.setAttribute('stroke','#d1d5db'); witness2.setAttribute('stroke-width','1');
+      svg.appendChild(witness2);
+    }
+    
+    // Dimension line with break in middle for text
+    const lineLength = Math.sqrt(Math.pow(dim.x2 - dim.x1, 2) + Math.pow(dim.y2 - dim.y1, 2));
+    const textWidth = dim.label.length * 6; // Approximate text width
+    const breakStart = (lineLength - textWidth) / 2;
+    const breakEnd = (lineLength + textWidth) / 2;
+    
+    // First segment of dimension line
+    const dimLine1=document.createElementNS('http://www.w3.org/2000/svg','line');
+    if(dim.vertical){
+      const ratio1 = breakStart / lineLength;
+      dimLine1.setAttribute('x1',dim.x1); dimLine1.setAttribute('y1',dim.y1);
+      dimLine1.setAttribute('x2',dim.x1); dimLine1.setAttribute('y2',dim.y1 + (dim.y2 - dim.y1) * ratio1);
+    } else {
+      const ratio1 = breakStart / lineLength;
+      dimLine1.setAttribute('x1',dim.x1); dimLine1.setAttribute('y1',dim.y1);
+      dimLine1.setAttribute('x2',dim.x1 + (dim.x2 - dim.x1) * ratio1); dimLine1.setAttribute('y2',dim.y1);
+    }
+    dimLine1.setAttribute('stroke','#d1d5db'); dimLine1.setAttribute('stroke-width','1');
+    svg.appendChild(dimLine1);
+    
+    // Second segment of dimension line
+    const dimLine2=document.createElementNS('http://www.w3.org/2000/svg','line');
+    if(dim.vertical){
+      const ratio2 = breakEnd / lineLength;
+      dimLine2.setAttribute('x1',dim.x1); dimLine2.setAttribute('y1',dim.y1 + (dim.y2 - dim.y1) * ratio2);
+      dimLine2.setAttribute('x2',dim.x1); dimLine2.setAttribute('y2',dim.y2);
+    } else {
+      const ratio2 = breakEnd / lineLength;
+      dimLine2.setAttribute('x1',dim.x1 + (dim.x2 - dim.x1) * ratio2); dimLine2.setAttribute('y1',dim.y1);
+      dimLine2.setAttribute('x2',dim.x2); dimLine2.setAttribute('y2',dim.y2);
+    }
+    dimLine2.setAttribute('stroke','#d1d5db'); dimLine2.setAttribute('stroke-width','1');
+    svg.appendChild(dimLine2);
+    
+    // Dimension text
+    const dimText=document.createElementNS('http://www.w3.org/2000/svg','text');
+    dimText.setAttribute('x',dim.x3); dimText.setAttribute('y',dim.y3);
+    dimText.setAttribute('class','door-dimension'); dimText.setAttribute('text-anchor','middle');
+    dimText.setAttribute('dominant-baseline','middle');
+    dimText.setAttribute('font-size','8px');
+    dimText.setAttribute('fill','#d1d5db');
+    
+    // Rotate text for vertical dimensions
+    if(dim.vertical){
+      dimText.setAttribute('transform',`rotate(-90 ${dim.x3} ${dim.y3})`);
+    }
+    
+    dimText.textContent=dim.label;
+    svg.appendChild(dimText);
+    
+    // Arrowheads pointing to witness marks (or dimension line ends for inside dimensions)
+    const arrow1=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    if(dim.vertical){
+      // Vertical dimension - arrows point up at top, down at bottom
+      if(dim.y1 < dim.y2){
+        // Top arrow - pointing down
+        arrow1.setAttribute('points',`${dim.x1-2},${dim.y1+3} ${dim.x1},${dim.y1} ${dim.x1+2},${dim.y1+3}`);
+      } else {
+        // Bottom arrow - pointing up
+        arrow1.setAttribute('points',`${dim.x1-2},${dim.y1-3} ${dim.x1},${dim.y1} ${dim.x1+2},${dim.y1-3}`);
+      }
+    } else {
+      // Horizontal dimension - arrows point right at left, left at right
+      if(dim.x1 < dim.x2){
+        // Left arrow - pointing right
+        arrow1.setAttribute('points',`${dim.x1+3},${dim.y1-2} ${dim.x1},${dim.y1} ${dim.x1+3},${dim.y1+2}`);
+      } else {
+        // Right arrow - pointing left
+        arrow1.setAttribute('points',`${dim.x1-3},${dim.y1-2} ${dim.x1},${dim.y1} ${dim.x1-3},${dim.y1+2}`);
+      }
+    }
+    arrow1.setAttribute('fill','#d1d5db');
+    svg.appendChild(arrow1);
+    
+    const arrow2=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    if(dim.vertical){
+      // Vertical dimension - arrows point up at top, down at bottom
+      if(dim.y2 > dim.y1){
+        // Bottom arrow - pointing up
+        arrow2.setAttribute('points',`${dim.x2-2},${dim.y2-3} ${dim.x2},${dim.y2} ${dim.x2+2},${dim.y2-3}`);
+      } else {
+        // Top arrow - pointing down
+        arrow2.setAttribute('points',`${dim.x2-2},${dim.y2+3} ${dim.x2},${dim.y2} ${dim.x2+2},${dim.y2+3}`);
+      }
+    } else {
+      // Horizontal dimension - arrows point right at left, left at right
+      if(dim.x2 > dim.x1){
+        // Right arrow - pointing left
+        arrow2.setAttribute('points',`${dim.x2-3},${dim.y2-2} ${dim.x2},${dim.y2} ${dim.x2-3},${dim.y2+2}`);
+      } else {
+        // Left arrow - pointing right
+        arrow2.setAttribute('points',`${dim.x2+3},${dim.y2-2} ${dim.x2},${dim.y2} ${dim.x2+3},${dim.y2+2}`);
+      }
+    }
+    arrow2.setAttribute('fill','#d1d5db');
+    svg.appendChild(arrow2);
+  });
+  
+  // Clean blueprint style - no assembly arrows, just dimension lines
+  
+  diagram.appendChild(svg);
+  return diagram;
+}
+
+function renderDoorDiagrams(){
+  const container=$('#doorDiagrams');
+  container.innerHTML='';
+  
+  openings.forEach(opening=>{
+    const diagram=createDoorDiagram(opening);
+    container.appendChild(diagram);
+  });
+}
+
+function renderOpenings(){
+  const units=params.units;
+  const table=document.createElement('table');
+  const thead=document.createElement('thead');
+  thead.innerHTML=`<tr><th style="width:28%">Name</th><th>Width (${units})</th><th>Height (${units})</th><th>Doors</th><th></th></tr>`;
+  table.appendChild(thead);
+  const tb=document.createElement('tbody');
+  openings.forEach(row=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><input type="text" value="${row.name}" data-id="${row.id}" data-key="name"></td>
+      <td>
+        <div style="display:flex; gap:8px; align-items:center">
+          <input type="number" step="0.1" value="${row.width}" data-id="${row.id}" data-key="width" style="flex:1; width:auto">
+          <div class="unit-display" data-id="${row.id}" data-key="widthDisplay" style="min-width:70px">${fmt(row.width * (units==='mm'?1:(1/mmPerInch)), units)} ${units}</div>
+        </div>
+      </td>
+      <td>
+        <div style="display:flex; gap:8px; align-items:center">
+          <input type="number" step="0.1" value="${row.height}" data-id="${row.id}" data-key="height" style="flex:1; width:auto">
+          <div class="unit-display" data-id="${row.id}" data-key="heightDisplay" style="min-width:70px">${fmt(row.height * (units==='mm'?1:(1/mmPerInch)), units)} ${units}</div>
+        </div>
+      </td>
+      <td>
+        <select data-id="${row.id}" data-key="doors">
+          <option value="1" ${row.doors===1?'selected':''}>1</option>
+          <option value="2" ${row.doors===2?'selected':''}>2</option>
+        </select>
+      </td>
+      <td><button class="btn" data-remove="${row.id}">Remove</button></td>`;
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb);
+  $('#openingsTable').innerHTML=''; $('#openingsTable').appendChild(table);
+
+  $$('#openingsTable input, #openingsTable select').forEach(el=>{
+    el.addEventListener('input', e=>{
+      const id=e.target.getAttribute('data-id'); const key=e.target.getAttribute('data-key');
+      const row=openings.find(o=>o.id===id); if(!row) return;
+      if(key==='name'){row.name=e.target.value}
+      else if(key==='doors'){row.doors=parseInt(e.target.value)||1}
+      else if(key==='width'||key==='height'){
+        row[key]=parseFloat(e.target.value)||0;
+        // Update the unit display
+        const displayEl=$(e.target.parentElement.querySelector(`[data-key="${key}Display"]`));
+        if(displayEl){
+          const units=params.units;
+          const factor=(units==='mm')?1:(1/mmPerInch);
+          displayEl.textContent=`${fmt(row[key]*factor, units)} ${units}`;
+        }
+      }
+      computeAndRender();
+    });
+  });
+  $$('#openingsTable button[data-remove]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id=e.target.getAttribute('data-remove');
+      openings=openings.filter(o=>o.id!==id);
+      renderOpenings(); computeAndRender();
+    });
+  });
+}
+
+$('#btnAddOpening').addEventListener('click', ()=>{
+  openings.push({id:uid(),name:'Opening',width:600,height:700,doors:1});
+  renderOpenings(); computeAndRender();
+});
+
+$$('#units, #hingeCupInset, #sideOverlay, #topBottomOverlay, #centerGap, #panelAllowance, #stileWidth, #topRailWidth, #bottomRailWidth, #tongueLength, #grooveDepth, #kerf, #endTrim, #stockLengths, #existing6ft63, #existing8ft63, #existing6ft89, #existing8ft89')
+  .forEach(el=>el.addEventListener('input', ()=>{ readParams(); computeAndRender(); }));
+
+function buildCutList(){
+  const P=params; const items=[];
+  for(const row of openings){
+    const OW=row.width, OH=row.height, doors=row.doors;
+    const OS=P.sideOverlay, OT=P.topBottomOverlay, CG=P.centerGap;
+    const Wst=P.stileWidth, Wtop=P.topRailWidth, Wbot=P.bottomRailWidth;
+    const T=P.tongueLength, D=P.grooveDepth, A=P.panelAllowance;
+    const DW = (doors===1) ? (OW+2*OS) : (OW+2*OS-CG)/2;
+    const DH = OH + 2*OT;
+    const stileLen=DH;
+    const railLenTop = DW - 2*Wst + 2*T;
+    const railLenBot = DW - 2*Wst + 2*T;
+    const panelW = DW - 2*(Wst - D) - A;
+    const panelH = DH - ((Wtop - D) + (Wbot - D)) - A;
+    for(let d=0; d<doors; d++){
+      const doorLabel = doors===2 ? (d===0?'A':'B') : '-';
+      items.push({opening:row.name,doorLabel,piece:'Stile',cutLength:stileLen,cutWidth:Wst});
+      items.push({opening:row.name,doorLabel,piece:'Stile',cutLength:stileLen,cutWidth:Wst});
+      items.push({opening:row.name,doorLabel,piece:'Top Rail',cutLength:railLenTop,cutWidth:Wtop});
+      items.push({opening:row.name,doorLabel,piece:'Bottom Rail',cutLength:railLenBot,cutWidth:Wbot});
+      items.push({opening:row.name,doorLabel,piece:'Panel',cutLength:panelH,cutWidth:panelW});
+    }
+  }
+  return items;
+}
+
+function linearParts(cutList){
+  // Group pieces by width to avoid mixing different board widths
+  const widthGroups = {};
+  cutList.filter(c=>c.piece==='Stile' || c.piece==='Top Rail' || c.piece==='Bottom Rail')
+    .forEach(c => {
+      const width = c.cutWidth;
+      if (!widthGroups[width]) {
+        widthGroups[width] = [];
+      }
+      widthGroups[width].push({
+        length: c.cutLength,
+        label: `${c.piece} – ${c.opening} ${c.doorLabel}`,
+        width: c.cutWidth
+      });
+    });
+  
+  // Return all pieces grouped by width
+  return Object.values(widthGroups).flat();
+}
+
+function packBoards(items, stockLength, kerf, endTrim){
+  const sorted=[...items].sort((a,b)=>b.length-a.length); const boards=[];
+  for(const it of sorted){
+    let placed=false;
+    for(const b of boards){
+      const used=b.cuts.reduce((s,x)=>s+x.length,0)+Math.max(0,b.cuts.length-1)*kerf+endTrim;
+      if(it.length <= (stockLength-used+1e-6)){ b.cuts.push({length:it.length,label:it.label}); placed=true; break; }
+    }
+    if(!placed) boards.push({stockLength, cuts:[{length:it.length, label:it.label}], waste:0});
+  }
+  boards.forEach(b=>{
+    const used=b.cuts.reduce((s,x)=>s+x.length,0)+Math.max(0,b.cuts.length-1)*kerf+endTrim;
+    b.waste=Math.max(0, stockLength-used);
+  });
+  return boards;
+}
+
+function generateStockRecommendations(packs){
+  const units=params.units; const factor=(units==='mm')?1:(1/mmPerInch);
+  const recommendations = [];
+  
+  // Convert stock lengths to feet for recommendations
+  const stock6ft = 1829; // 6 feet in mm
+  const stock8ft = 2438; // 8 feet in mm
+  
+  packs.forEach(pack => {
+    const stockLength = pack.stockLength;
+    const boards = pack.boards;
+    const totalBoards = boards.length;
+    const totalWaste = boards.reduce((sum, board) => sum + board.waste, 0);
+    const totalUsed = boards.reduce((sum, board) => sum + (stockLength - board.waste), 0);
+    const efficiency = ((totalUsed / (totalBoards * stockLength)) * 100).toFixed(1);
+    
+    const stockSize = stockLength === stock6ft ? '6 ft' : '8 ft';
+    const stockSizeInches = stockLength === stock6ft ? '72"' : '96"';
+    
+    recommendations.push({
+      stockSize: stockSize,
+      stockSizeInches: stockSizeInches,
+      stockLength: stockLength,
+      totalBoards: totalBoards,
+      totalWaste: totalWaste,
+      efficiency: efficiency,
+      boards: boards,
+      boardWidth: boards.length > 0 && boards[0].cuts.length > 0 ? boards[0].cuts[0].width : 0
+    });
+  });
+  
+  return recommendations;
+}
+
+function renderStockRecommendations(packs){
+  const recommendations = generateStockRecommendations(packs);
+  const container = document.createElement('div');
+  container.className = 'card';
+  container.style.pageBreakAfter = 'always';
+  
+  const title = document.createElement('h2');
+  title.textContent = 'Stock Purchase Recommendations';
+  container.appendChild(title);
+  
+  const content = document.createElement('div');
+  content.className = 'content';
+  
+  recommendations.forEach(rec => {
+    const recDiv = document.createElement('div');
+    recDiv.style.marginBottom = '20px';
+    recDiv.style.padding = '15px';
+    recDiv.style.border = '1px solid #ccc';
+    recDiv.style.borderRadius = '8px';
+    
+    // Calculate what you need to purchase based on board width and length
+    let existingStock = 0;
+    if (rec.stockLength === 1829) {
+      existingStock = rec.boardWidth === 63 ? params.existing6ft63 : params.existing6ft89;
+    } else if (rec.stockLength === 2438) {
+      existingStock = rec.boardWidth === 63 ? params.existing8ft63 : params.existing8ft89;
+    }
+    const boardsToPurchase = Math.max(0, rec.totalBoards - existingStock);
+    
+    recDiv.innerHTML = `
+      <h3>Stock Purchase Recommendation: ${rec.stockSize} (${rec.stockSizeInches}) - ${fmt(rec.boardWidth*factor, units)} ${units} Wide</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px;">
+        <div><strong>Boards Needed:</strong> ${rec.totalBoards}</div>
+        <div><strong>Boards You Have:</strong> ${existingStock}</div>
+        <div><strong>Boards to Purchase:</strong> ${boardsToPurchase}</div>
+        <div><strong>Total Waste:</strong> ${fmt(rec.totalWaste, params.units)} ${params.units}</div>
+        <div><strong>Material Efficiency:</strong> ${rec.efficiency}%</div>
+        <div><strong>Stock Length:</strong> ${fmt(rec.stockLength, params.units)} ${params.units}</div>
+      </div>
+      ${boardsToPurchase === 0 ? 
+        '<div style="margin-top: 10px; padding: 10px; background: #d4edda; border-radius: 4px; font-size: 12px; color: #155724;"><strong>✓ You have enough stock!</strong> No purchase needed.</div>' :
+        '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 4px; font-size: 12px; color: #856404;"><strong>Purchase needed:</strong> Buy ' + boardsToPurchase + ' more ' + rec.stockSize + ' boards (' + fmt(rec.boardWidth*factor, units) + ' ' + units + ' wide).</div>'
+      }
+    `;
+    
+    content.appendChild(recDiv);
+  });
+  
+  container.appendChild(content);
+  return container;
+}
+
+function renderCutList(cutList){
+  const units=params.units; const factor=(units==='mm')?1:(1/mmPerInch);
+  const container=$('#cutListTable');
+  container.innerHTML='';
+  
+  // Create optimized cut list with stock recommendations
+  const doorCard = document.createElement('div');
+  doorCard.className = 'card';
+  
+  const title = document.createElement('h2');
+  title.textContent = `Optimized Cut List - All Doors`;
+  doorCard.appendChild(title);
+  
+  const content = document.createElement('div');
+  content.className = 'content';
+  
+  const tbl = document.createElement('table');
+  tbl.innerHTML = `<thead><tr><th>Opening</th><th>Door</th><th>Piece</th><th>Cut Length (${units})</th><th>Cut Width (${units})</th></tr></thead>`;
+  const tb = document.createElement('tbody');
+  
+  cutList.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.opening}</td><td>${c.doorLabel}</td><td>${c.piece}</td><td>${fmt(c.cutLength*factor, units)}</td><td>${fmt(c.cutWidth*factor, units)}</td>`;
+    tb.appendChild(tr);
+  });
+  
+  tbl.appendChild(tb);
+  content.appendChild(tbl);
+  doorCard.appendChild(content);
+  container.appendChild(doorCard);
+}
+
+function renderBoardsSVG(packs){
+  const wrap=$('#boardsWrap'); wrap.innerHTML='';
+  packs.forEach(pack=>{
+    const boards=pack.boards; const stock=pack.stockLength;
+    const card=document.createElement('div'); card.className='board';
+    const h3=document.createElement('h3'); 
+    // Get board width from the first cut (all cuts in a pack have same width)
+    const boardWidth = boards.length > 0 && boards[0].cuts.length > 0 ? boards[0].cuts[0].width : 'Unknown';
+    const units = params.units;
+    const factor = (units === 'mm') ? 1 : (1/mmPerInch);
+    h3.textContent=`Stock ${fmt(stock,'mm')} mm (${fmt(boardWidth*factor, units)} ${units} Wide) — ${boards.length} board(s)`; 
+    card.appendChild(h3);
+    const W=900,Hper=60,margin=10;
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox',`0 0 ${W} ${Hper*boards.length + margin*2}`);
+    svg.setAttribute('preserveAspectRatio','xMinYMin meet');
+    const scaleX=(x)=> (x/stock) * (W-2*margin);
+    boards.forEach((b,idx)=>{
+      const y=margin + idx*Hper + 10;
+      const boardRect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      boardRect.setAttribute('x',margin); boardRect.setAttribute('y',y-6);
+      boardRect.setAttribute('width',W-2*margin); boardRect.setAttribute('height',30);
+      boardRect.setAttribute('class','waste'); svg.appendChild(boardRect);
+      let pos=params.endTrim;
+      b.cuts.forEach((c,i)=>{
+        const x=margin + scaleX(pos); const w=Math.max(1, scaleX(c.length));
+        const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        r.setAttribute('x',x); r.setAttribute('y',y-6); r.setAttribute('width',w); r.setAttribute('height',30);
+        r.setAttribute('rx',4); r.setAttribute('ry',4); r.setAttribute('class','cutRect'); svg.appendChild(r);
+        const text=document.createElementNS('http://www.w3.org/2000/svg','text');
+        text.setAttribute('x',x+4); text.setAttribute('y',y+12); text.setAttribute('class','cutLabel');
+        text.textContent=`${c.label} • ${fmt(c.length,'mm')} mm`; svg.appendChild(text);
+        pos += c.length;
+        if(i<b.cuts.length-1){
+          const kx=margin + scaleX(pos);
+          const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+          line.setAttribute('x1',kx); line.setAttribute('x2',kx); line.setAttribute('y1',y-6); line.setAttribute('y2',y+24);
+          line.setAttribute('class','kerf'); svg.appendChild(line);
+          pos += params.kerf;
+        }
+      });
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x',margin); t.setAttribute('y',y-10); t.setAttribute('class','cutLabel');
+      t.textContent=`Board ${idx+1} • Waste: ${fmt(b.waste,'mm')} mm`; svg.appendChild(t);
+    });
+    const box=document.createElement('div'); box.className='svgwrap'; box.appendChild(svg); card.appendChild(box); wrap.appendChild(card);
+  });
+}
+
+function exportCSV(cutList){
+  const u=params.units; const factor=(u==='mm')?1:(1/mmPerInch);
+  const rows=[['Opening','Door','Piece',`Cut Length (${u})`,`Cut Width (${u})`]];
+  for(const c of cutList){ rows.push([c.opening,c.doorLabel,c.piece,fmt(c.cutLength*factor,u),fmt(c.cutWidth*factor,u)]) }
+  const csv=rows.map(r=>r.map(x=>String(x).includes(',')?`"${String(x).replace(/"/g,'""')}"`:x).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='cut_list.csv'; a.click(); URL.revokeObjectURL(url);
+}
+function exportJSON(cutList,packs){
+  const payload={params,openings,cutList,packs}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='cabinet_plan.json'; a.click(); URL.revokeObjectURL(url);
+}
+
+function computeAndRender(){
+  readParams();
+  updateUnitDisplays();
+  const cutList=buildCutList(); renderCutList(cutList);
+  renderDoorDiagrams();
+  const linear=linearParts(cutList);
+  
+  // Calculate efficiency for both stock lengths and choose the most efficient
+  const pack6ft = {stockLength:1829, boards:packBoards(linear,1829,params.kerf,params.endTrim)};
+  const pack8ft = {stockLength:2438, boards:packBoards(linear,2438,params.kerf,params.endTrim)};
+  
+  const efficiency6ft = calculateEfficiency(pack6ft);
+  const efficiency8ft = calculateEfficiency(pack8ft);
+  
+  // Use the most efficient stock length
+  const optimalPack = efficiency8ft > efficiency6ft ? pack8ft : pack6ft;
+  const packs = [optimalPack];
+  
+  renderBoardsSVG(packs);
+  
+  // Add stock recommendations to the cut list container for printing
+  const stockRecs = renderStockRecommendations(packs);
+  $('#cutListTable').appendChild(stockRecs);
+  
+  $('#btnExportCSV').onclick=()=>exportCSV(cutList);
+  $('#btnExportJSON').onclick=()=>exportJSON(cutList,packs);
+}
+
+function calculateEfficiency(pack){
+  const totalBoards = pack.boards.length;
+  const totalWaste = pack.boards.reduce((sum, board) => sum + board.waste, 0);
+  const totalUsed = pack.boards.reduce((sum, board) => sum + (pack.stockLength - board.waste), 0);
+  return (totalUsed / (totalBoards * pack.stockLength)) * 100;
+}
+
+renderOpenings(); computeAndRender();
+</script>
+</body>
+</html>
