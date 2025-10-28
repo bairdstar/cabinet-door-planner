@@ -767,9 +767,9 @@ function linearParts(cutList){
         width: c.cutWidth
       });
     });
-  
-  // Return all pieces grouped by width
-  return Object.values(widthGroups).flat();
+
+  // Return groups by width (not flattened) to keep widths separate
+  return widthGroups;
 }
 
 function packBoards(items, stockLength, kerf, endTrim){
@@ -778,9 +778,9 @@ function packBoards(items, stockLength, kerf, endTrim){
     let placed=false;
     for(const b of boards){
       const used=b.cuts.reduce((s,x)=>s+x.length,0)+Math.max(0,b.cuts.length-1)*kerf+endTrim;
-      if(it.length <= (stockLength-used+1e-6)){ b.cuts.push({length:it.length,label:it.label}); placed=true; break; }
+      if(it.length <= (stockLength-used+1e-6)){ b.cuts.push({length:it.length,label:it.label,width:it.width}); placed=true; break; }
     }
-    if(!placed) boards.push({stockLength, cuts:[{length:it.length, label:it.label}], waste:0});
+    if(!placed) boards.push({stockLength, cuts:[{length:it.length, label:it.label, width:it.width}], waste:0});
   }
   boards.forEach(b=>{
     const used=b.cuts.reduce((s,x)=>s+x.length,0)+Math.max(0,b.cuts.length-1)*kerf+endTrim;
@@ -853,18 +853,20 @@ function renderStockRecommendations(packs){
     const boardsToPurchase = Math.max(0, rec.totalBoards - existingStock);
     
     recDiv.innerHTML = `
-      <h3>Stock Purchase Recommendation: ${rec.stockSize} (${rec.stockSizeInches}) - ${fmt(rec.boardWidth*factor, units)} ${units} Wide</h3>
+      <h3>✓ Most Efficient Stock: ${rec.stockSize} (${rec.stockSizeInches}) Boards - ${fmt(rec.boardWidth*factor, units)} ${units} Wide</h3>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px;">
+        <div><strong>Stock Width:</strong> ${fmt(rec.boardWidth*factor, units)} ${units}</div>
+        <div><strong>Stock Length:</strong> ${fmt(rec.stockLength, params.units)} ${params.units} (${rec.stockSize})</div>
         <div><strong>Boards Needed:</strong> ${rec.totalBoards}</div>
         <div><strong>Boards You Have:</strong> ${existingStock}</div>
         <div><strong>Boards to Purchase:</strong> ${boardsToPurchase}</div>
+        <div><strong>Material Efficiency:</strong> ${rec.efficiency}% efficient</div>
         <div><strong>Total Waste:</strong> ${fmt(rec.totalWaste, params.units)} ${params.units}</div>
-        <div><strong>Material Efficiency:</strong> ${rec.efficiency}%</div>
-        <div><strong>Stock Length:</strong> ${fmt(rec.stockLength, params.units)} ${params.units}</div>
+        <div><strong>Recommended Stock:</strong> ${rec.stockSize} × ${fmt(rec.boardWidth*factor, units)} ${units}</div>
       </div>
-      ${boardsToPurchase === 0 ? 
-        '<div style="margin-top: 10px; padding: 10px; background: #d4edda; border-radius: 4px; font-size: 12px; color: #155724;"><strong>✓ You have enough stock!</strong> No purchase needed.</div>' :
-        '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 4px; font-size: 12px; color: #856404;"><strong>Purchase needed:</strong> Buy ' + boardsToPurchase + ' more ' + rec.stockSize + ' boards (' + fmt(rec.boardWidth*factor, units) + ' ' + units + ' wide).</div>'
+      ${boardsToPurchase === 0 ?
+        '<div style="margin-top: 10px; padding: 10px; background: #d4edda; border-radius: 4px; font-size: 12px; color: #155724;"><strong>✓ You have enough stock!</strong> No purchase needed for this board size.</div>' :
+        '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 4px; font-size: 12px; color: #856404;"><strong>📋 Purchase needed:</strong> Buy ' + boardsToPurchase + ' boards of ' + rec.stockSize + ' length × ' + fmt(rec.boardWidth*factor, units) + ' ' + units + ' width.</div>'
       }
     `;
     
@@ -912,12 +914,13 @@ function renderBoardsSVG(packs){
   packs.forEach(pack=>{
     const boards=pack.boards; const stock=pack.stockLength;
     const card=document.createElement('div'); card.className='board';
-    const h3=document.createElement('h3'); 
+    const h3=document.createElement('h3');
     // Get board width from the first cut (all cuts in a pack have same width)
     const boardWidth = boards.length > 0 && boards[0].cuts.length > 0 ? boards[0].cuts[0].width : 'Unknown';
     const units = params.units;
     const factor = (units === 'mm') ? 1 : (1/mmPerInch);
-    h3.textContent=`Stock ${fmt(stock,'mm')} mm (${fmt(boardWidth*factor, units)} ${units} Wide) — ${boards.length} board(s)`; 
+    const stockSize = stock === 1829 ? '6 ft (72")' : stock === 2438 ? '8 ft (96")' : 'Custom';
+    h3.textContent=`Board Layout: ${stockSize} Length × ${fmt(boardWidth*factor, units)} ${units} Width — ${boards.length} board(s) needed`;
     card.appendChild(h3);
     const W=900,Hper=60,margin=10;
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -974,25 +977,31 @@ function computeAndRender(){
   updateUnitDisplays();
   const cutList=buildCutList(); renderCutList(cutList);
   renderDoorDiagrams();
-  const linear=linearParts(cutList);
-  
-  // Calculate efficiency for both stock lengths and choose the most efficient
-  const pack6ft = {stockLength:1829, boards:packBoards(linear,1829,params.kerf,params.endTrim)};
-  const pack8ft = {stockLength:2438, boards:packBoards(linear,2438,params.kerf,params.endTrim)};
-  
-  const efficiency6ft = calculateEfficiency(pack6ft);
-  const efficiency8ft = calculateEfficiency(pack8ft);
-  
-  // Use the most efficient stock length
-  const optimalPack = efficiency8ft > efficiency6ft ? pack8ft : pack6ft;
-  const packs = [optimalPack];
-  
+  const widthGroups=linearParts(cutList);
+  const packs = [];
+
+  // Process each width group separately to keep different board widths separate
+  Object.keys(widthGroups).forEach(width => {
+    const items = widthGroups[width];
+
+    // Calculate efficiency for both stock lengths (6ft and 8ft)
+    const pack6ft = {stockLength:1829, boards:packBoards(items,1829,params.kerf,params.endTrim)};
+    const pack8ft = {stockLength:2438, boards:packBoards(items,2438,params.kerf,params.endTrim)};
+
+    const efficiency6ft = calculateEfficiency(pack6ft);
+    const efficiency8ft = calculateEfficiency(pack8ft);
+
+    // Use the most efficient stock length for this width
+    const optimalPack = efficiency8ft > efficiency6ft ? pack8ft : pack6ft;
+    packs.push(optimalPack);
+  });
+
   renderBoardsSVG(packs);
-  
+
   // Add stock recommendations to the cut list container for printing
   const stockRecs = renderStockRecommendations(packs);
   $('#cutListTable').appendChild(stockRecs);
-  
+
   $('#btnExportCSV').onclick=()=>exportCSV(cutList);
   $('#btnExportJSON').onclick=()=>exportJSON(cutList,packs);
 }
