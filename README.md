@@ -97,10 +97,20 @@ For each cabinet opening, specify:
 ### 5. **Print & Export**
 
 #### **Print**
-- Press `Ctrl+P` or click Print button
-- **Cut List**: Complete parts list
-- **Stock Recommendations**: Purchase guidance
-- **Board Layouts**: Visual cutting diagrams (landscape orientation)
+Two print options are available:
+
+1. **Print Full Project** - Complete documentation including:
+   - Cut List with all parts
+   - Door Construction Visuals with dimensions
+   - Stock Purchase Recommendations
+   - Board Layout diagrams
+   - Mixed portrait/landscape orientation as needed
+
+2. **Print Board Layouts** - Board cutting diagrams only:
+   - **Landscape orientation** for optimal viewing
+   - Multiple boards per page when possible
+   - Ideal for shop floor use
+   - Excludes all other project information
 
 #### **Export**
 - **CSV**: Cut list data for spreadsheet import
@@ -158,9 +168,11 @@ README.md                   # This documentation
 - Allow for end trim on each board
 
 ### **Printing**
-- Use landscape orientation for board layouts
+- **Use "Print Board Layouts"** for shop floor cutting diagrams (automatic landscape)
+- **Use "Print Full Project"** for complete documentation with all calculations
 - Print on white paper for best visibility
 - Consider laminating shop copies for durability
+- Board layouts will fit multiple boards per page when space allows
 
 ## Troubleshooting
 

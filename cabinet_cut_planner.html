@@ -54,19 +54,19 @@
   .rightCol{display:grid; grid-template-rows:auto auto 1fr; gap:16px; min-height:0}
   .stickyButtons{display:flex; gap:8px; align-items:center}
   @media print{
-    * { 
-      -webkit-print-color-adjust: exact !important; 
-      color-adjust: exact !important; 
+    * {
+      -webkit-print-color-adjust: exact !important;
+      color-adjust: exact !important;
       background: white !important;
       color: black !important;
     }
     body{background:#fff !important; color:#000 !important; margin:0; padding:20px}
-    .wrap{display:block} 
+    .wrap{display:block}
     .card{break-inside:avoid; page-break-inside:avoid; margin-bottom:20px; border:1px solid #ccc; padding:15px; background:white !important}
-    .svgwrap{background:none !important} 
+    .svgwrap{background:none !important}
     .cutLabel{font-size:9px; fill:#000 !important}
-    .cutRect{fill:#fff !important; stroke:#000 !important} 
-    .waste{fill:#fff !important; stroke:#888 !important} 
+    .cutRect{fill:#fff !important; stroke:#000 !important}
+    .waste{fill:#fff !important; stroke:#888 !important}
     .kerf{stroke:#888 !important}
     .door-diagram{page-break-inside:avoid; page-break-after:always; margin-bottom:30px; background:white !important}
     .door-svg{background:white !important}
@@ -83,10 +83,48 @@
     .opening-details{display:grid; grid-template-columns:1fr 1fr; gap:15px; font-size:12px; color:black !important}
     h1,h2,h3,h4,h5,h6{color:black !important}
     p,div,span{color:black !important}
-    
+
     /* Landscape ONLY for board layouts - proper print styles */
     .board{page-break-before:always; page-break-after:always}
     .board svg{page-break-inside:avoid}
+
+    /* Board layouts only mode - hide everything except board layouts */
+    body.print-boards-only header,
+    body.print-boards-only .card:not(:has(#boardsWrap)){
+      display:none !important;
+    }
+    body.print-boards-only .wrap{
+      display:block;
+      padding:10px;
+    }
+    body.print-boards-only .board{
+      page-break-inside:avoid;
+      page-break-after:auto;
+      margin:0 0 20px 0;
+      padding:15px;
+      border:1px solid #333 !important;
+    }
+    body.print-boards-only .board:first-child{
+      page-break-before:avoid;
+    }
+    body.print-boards-only{
+      padding:10px;
+      margin:0;
+    }
+    /* Optimize board display for landscape */
+    body.print-boards-only .board h3{
+      font-size:14px;
+      margin-bottom:10px;
+    }
+    body.print-boards-only .svgwrap{
+      margin:0;
+    }
+  }
+
+  /* Landscape orientation for board-only printing */
+  @page boardLayout{
+    size:landscape;
+    margin:0.5in;
   }
 </style>
 </head>
@@ -98,7 +136,8 @@
   <div class="stickyButtons">
     <button class="btn" id="btnExportCSV">Export CSV</button>
     <button class="btn" id="btnExportJSON">Export JSON</button>
-    <button class="btn primary" onclick="window.print()">Print</button>
+    <button class="btn primary" onclick="printFullProject()">Print Full Project</button>
+    <button class="btn primary" onclick="printBoardLayoutsOnly()">Print Board Layouts</button>
   </div>
 </header>
 
@@ -963,6 +1002,43 @@ function calculateEfficiency(pack){
   const totalWaste = pack.boards.reduce((sum, board) => sum + board.waste, 0);
   const totalUsed = pack.boards.reduce((sum, board) => sum + (pack.stockLength - board.waste), 0);
   return (totalUsed / (totalBoards * pack.stockLength)) * 100;
+}
+
+// Print functions for different modes
+function printFullProject(){
+  document.body.classList.remove('print-boards-only');
+  // Remove landscape style if it exists
+  const landscapeStyle = document.getElementById('landscape-print-style');
+  if(landscapeStyle) landscapeStyle.remove();
+  window.print();
+}
+
+function printBoardLayoutsOnly(){
+  document.body.classList.add('print-boards-only');
+
+  // Inject landscape orientation style for better browser support
+  const landscapeStyle = document.createElement('style');
+  landscapeStyle.id = 'landscape-print-style';
+  landscapeStyle.textContent = `
+    @page { size: landscape; margin: 0.5in; }
+    @media print {
+      body.print-boards-only {
+        width: 100%;
+        height: 100%;
+      }
+    }
+  `;
+  document.head.appendChild(landscapeStyle);
+
+  window.print();
+
+  // Clean up class and style after print dialog closes
+  setTimeout(() => {
+    document.body.classList.remove('print-boards-only');
+    if(landscapeStyle && landscapeStyle.parentNode){
+      landscapeStyle.remove();
+    }
+  }, 100);
 }
 
 renderOpenings(); computeAndRender();
