@@ -273,6 +273,30 @@
           <input type="number" id="existing8ft89" value="0" min="0">
         </div>
       </div>
+      <hr style="border-color:#334155; margin:15px 0">
+      <h3 style="margin:0 0 12px 0; color:#cbd5e1; font-size:14px">Panel Stock</h3>
+      <div class="row">
+        <div>
+          <label>Panel Stock Options (Format: Width×Height, grain^ or grain→)</label>
+          <input type="text" id="panelStockOptions" placeholder='e.g., 1220×2440 grain^, 914×2440 grain^' value="">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Grain orientation matters</label>
+          <select id="panelGrainMatters">
+            <option value="yes" selected>Yes (grain must be vertical ^)</option>
+            <option value="no">No (no grain / smooth - orientation irrelevant)</option>
+          </select>
+        </div>
+        <div>
+          <label>Panel kerf (if different from frame kerf)</label>
+          <div class="unit-input">
+            <input type="number" id="panelKerf" value="3.2" step="0.1">
+            <div class="unit-display" id="panelKerfDisplay">3.2 mm</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -281,7 +305,10 @@
       <h2>Openings <span class="muted small">Add one row per cabinet opening</span></h2>
       <div class="content">
         <div class="flex" style="justify-content:space-between; margin-bottom:8px">
-          <button class="btn" id="btnAddOpening">+ Add Opening</button>
+          <div class="flex" style="gap:8px">
+            <button class="btn" id="btnAddOpening">+ Add Opening</button>
+            <button class="btn" id="btnClearExceptExamples" style="background:linear-gradient(180deg,#7f1d1d,#991b1b); border-color:#dc2626">Clear All Except Examples</button>
+          </div>
           <div class="muted small">Widths/Heights are cabinet openings (not door sizes)</div>
         </div>
         <div id="openingsTable"></div>
@@ -304,6 +331,11 @@
       <h2>Board Layout</h2>
       <div class="content boards" id="boardsWrap"></div>
     </div>
+
+    <div class="card">
+      <h2>Panel Layout</h2>
+      <div class="content boards" id="panelBoardsWrap"></div>
+    </div>
   </div>
 </div>
 
@@ -315,10 +347,11 @@ function fmt(n,u){return u==='mm'?n.toFixed(1):n.toFixed(3)}
 
 let params={units:'mm',hingeCupInset:5,sideOverlay:14,topBottomOverlay:14,centerGap:3,panelAllowance:0.8,
             stileWidth:63,topRailWidth:63,bottomRailWidth:89,tongueLength:12.7,grooveDepth:12.7,
-            kerf:3.2,endTrim:25,stockLengths:[1829,2438],existing6ft63:0,existing8ft63:0,existing6ft89:0,existing8ft89:0};
+            kerf:3.2,endTrim:25,stockLengths:[1829,2438],existing6ft63:0,existing8ft63:0,existing6ft89:0,existing8ft89:0,
+            panelStockOptions:'',panelGrainMatters:'yes',panelKerf:3.2};
 
-let openings=[{id:uid(),name:'Base - Sink',width:762,height:610,doors:2},
-              {id:uid(),name:'Upper - Left',width:381,height:762,doors:1}];
+let openings=[{id:uid(),name:'Base - Sink',width:762,height:610,doors:2,isExample:true},
+              {id:uid(),name:'Upper - Left',width:381,height:762,doors:1,isExample:true}];
 
 function readParams(){
   params.units=$('#units').value;
@@ -339,6 +372,9 @@ function readParams(){
   params.existing8ft63=parseInt($('#existing8ft63').value)||0;
   params.existing6ft89=parseInt($('#existing6ft89').value)||0;
   params.existing8ft89=parseInt($('#existing8ft89').value)||0;
+  params.panelStockOptions=$('#panelStockOptions').value;
+  params.panelGrainMatters=$('#panelGrainMatters').value;
+  params.panelKerf=parseFloat($('#panelKerf').value)||params.kerf;
 }
 
 function updateUnitDisplays(){
@@ -357,7 +393,8 @@ function updateUnitDisplays(){
     {id:'tongueLengthDisplay', value:params.tongueLength},
     {id:'grooveDepthDisplay', value:params.grooveDepth},
     {id:'kerfDisplay', value:params.kerf},
-    {id:'endTrimDisplay', value:params.endTrim}
+    {id:'endTrimDisplay', value:params.endTrim},
+    {id:'panelKerfDisplay', value:params.panelKerf}
   ];
   
   displays.forEach(d=>{
@@ -446,7 +483,7 @@ function createDoorDiagram(opening){
   const panel=document.createElementNS('http://www.w3.org/2000/svg','rect');
   panel.setAttribute('x',panelX); panel.setAttribute('y',panelY);
   panel.setAttribute('width',panelW*scale); panel.setAttribute('height',panelH*scale);
-  panel.setAttribute('fill','rgba(34,211,238,0.1)'); panel.setAttribute('stroke','#22d3ee');
+  panel.setAttribute('fill','none'); panel.setAttribute('stroke','#000000');
   panel.setAttribute('stroke-width','2');
   svg.appendChild(panel);
   
@@ -454,7 +491,7 @@ function createDoorDiagram(opening){
   const leftStile=document.createElementNS('http://www.w3.org/2000/svg','rect');
   leftStile.setAttribute('x',leftStileX); leftStile.setAttribute('y',leftStileY);
   leftStile.setAttribute('width',Wst*scale); leftStile.setAttribute('height',DH*scale);
-  leftStile.setAttribute('fill','rgba(74,222,128,0.1)'); leftStile.setAttribute('stroke','#4ade80');
+  leftStile.setAttribute('fill','none'); leftStile.setAttribute('stroke','#000000');
   leftStile.setAttribute('stroke-width','2');
   svg.appendChild(leftStile);
   
@@ -462,7 +499,7 @@ function createDoorDiagram(opening){
   const rightStile=document.createElementNS('http://www.w3.org/2000/svg','rect');
   rightStile.setAttribute('x',rightStileX); rightStile.setAttribute('y',rightStileY);
   rightStile.setAttribute('width',Wst*scale); rightStile.setAttribute('height',DH*scale);
-  rightStile.setAttribute('fill','rgba(74,222,128,0.1)'); rightStile.setAttribute('stroke','#4ade80');
+  rightStile.setAttribute('fill','none'); rightStile.setAttribute('stroke','#000000');
   rightStile.setAttribute('stroke-width','2');
   svg.appendChild(rightStile);
   
@@ -470,7 +507,7 @@ function createDoorDiagram(opening){
   const topRail=document.createElementNS('http://www.w3.org/2000/svg','rect');
   topRail.setAttribute('x',topRailX); topRail.setAttribute('y',topRailY);
   topRail.setAttribute('width',railLenTop*scale); topRail.setAttribute('height',Wtop*scale);
-  topRail.setAttribute('fill','rgba(74,222,128,0.1)'); topRail.setAttribute('stroke','#4ade80');
+  topRail.setAttribute('fill','none'); topRail.setAttribute('stroke','#000000');
   topRail.setAttribute('stroke-width','2');
   svg.appendChild(topRail);
   
@@ -478,7 +515,7 @@ function createDoorDiagram(opening){
   const bottomRail=document.createElementNS('http://www.w3.org/2000/svg','rect');
   bottomRail.setAttribute('x',bottomRailX); bottomRail.setAttribute('y',bottomRailY);
   bottomRail.setAttribute('width',railLenBot*scale); bottomRail.setAttribute('height',Wbot*scale);
-  bottomRail.setAttribute('fill','rgba(74,222,128,0.1)'); bottomRail.setAttribute('stroke','#4ade80');
+  bottomRail.setAttribute('fill','none'); bottomRail.setAttribute('stroke','#000000');
   bottomRail.setAttribute('stroke-width','2');
   svg.appendChild(bottomRail);
   
@@ -524,7 +561,7 @@ function createDoorDiagram(opening){
         witness1.setAttribute('x1',dim.x1); witness1.setAttribute('y1',dim.y1 - 10);
         witness1.setAttribute('x2',dim.x1); witness1.setAttribute('y2',dim.y1);
       }
-      witness1.setAttribute('stroke','#d1d5db'); witness1.setAttribute('stroke-width','1');
+      witness1.setAttribute('stroke','#000000'); witness1.setAttribute('stroke-width','1');
       svg.appendChild(witness1);
       
       const witness2=document.createElementNS('http://www.w3.org/2000/svg','line');
@@ -537,7 +574,7 @@ function createDoorDiagram(opening){
         witness2.setAttribute('x1',dim.x2); witness2.setAttribute('y1',dim.y2 + 10);
         witness2.setAttribute('x2',dim.x2); witness2.setAttribute('y2',dim.y2);
       }
-      witness2.setAttribute('stroke','#d1d5db'); witness2.setAttribute('stroke-width','1');
+      witness2.setAttribute('stroke','#000000'); witness2.setAttribute('stroke-width','1');
       svg.appendChild(witness2);
     }
     
@@ -558,7 +595,7 @@ function createDoorDiagram(opening){
       dimLine1.setAttribute('x1',dim.x1); dimLine1.setAttribute('y1',dim.y1);
       dimLine1.setAttribute('x2',dim.x1 + (dim.x2 - dim.x1) * ratio1); dimLine1.setAttribute('y2',dim.y1);
     }
-    dimLine1.setAttribute('stroke','#d1d5db'); dimLine1.setAttribute('stroke-width','1');
+    dimLine1.setAttribute('stroke','#000000'); dimLine1.setAttribute('stroke-width','1');
     svg.appendChild(dimLine1);
     
     // Second segment of dimension line
@@ -572,7 +609,7 @@ function createDoorDiagram(opening){
       dimLine2.setAttribute('x1',dim.x1 + (dim.x2 - dim.x1) * ratio2); dimLine2.setAttribute('y1',dim.y1);
       dimLine2.setAttribute('x2',dim.x2); dimLine2.setAttribute('y2',dim.y2);
     }
-    dimLine2.setAttribute('stroke','#d1d5db'); dimLine2.setAttribute('stroke-width','1');
+    dimLine2.setAttribute('stroke','#000000'); dimLine2.setAttribute('stroke-width','1');
     svg.appendChild(dimLine2);
     
     // Dimension text
@@ -581,7 +618,7 @@ function createDoorDiagram(opening){
     dimText.setAttribute('class','door-dimension'); dimText.setAttribute('text-anchor','middle');
     dimText.setAttribute('dominant-baseline','middle');
     dimText.setAttribute('font-size','8px');
-    dimText.setAttribute('fill','#d1d5db');
+    dimText.setAttribute('fill','#000000');
     
     // Rotate text for vertical dimensions
     if(dim.vertical){
@@ -612,7 +649,7 @@ function createDoorDiagram(opening){
         arrow1.setAttribute('points',`${dim.x1-3},${dim.y1-2} ${dim.x1},${dim.y1} ${dim.x1-3},${dim.y1+2}`);
       }
     }
-    arrow1.setAttribute('fill','#d1d5db');
+    arrow1.setAttribute('fill','#000000');
     svg.appendChild(arrow1);
     
     const arrow2=document.createElementNS('http://www.w3.org/2000/svg','polygon');
@@ -635,7 +672,7 @@ function createDoorDiagram(opening){
         arrow2.setAttribute('points',`${dim.x2+3},${dim.y2-2} ${dim.x2},${dim.y2} ${dim.x2+3},${dim.y2+2}`);
       }
     }
-    arrow2.setAttribute('fill','#d1d5db');
+    arrow2.setAttribute('fill','#000000');
     svg.appendChild(arrow2);
   });
   
@@ -650,6 +687,8 @@ function renderDoorDiagrams(){
   container.innerHTML='';
   
   openings.forEach(opening=>{
+    // Skip example doors - they should not appear in diagrams, cut lists, or board layouts
+    if(opening.isExample === true) return;
     const diagram=createDoorDiagram(opening);
     container.appendChild(diagram);
   });
@@ -664,8 +703,9 @@ function renderOpenings(){
   const tb=document.createElement('tbody');
   openings.forEach(row=>{
     const tr=document.createElement('tr');
+    const exampleTag = row.isExample ? '<span class="tag" style="background:#7f1d1d; border-color:#dc2626; color:#fca5a5; margin-left:4px; font-size:10px">EXAMPLE</span>' : '';
     tr.innerHTML=`
-      <td><input type="text" value="${row.name}" data-id="${row.id}" data-key="name"></td>
+      <td><div style="display:flex; align-items:center"><input type="text" value="${row.name}" data-id="${row.id}" data-key="name" style="flex:1">${exampleTag}</div></td>
       <td>
         <div style="display:flex; gap:8px; align-items:center">
           <input type="number" step="0.1" value="${row.width}" data-id="${row.id}" data-key="width" style="flex:1; width:auto">
@@ -690,10 +730,23 @@ function renderOpenings(){
   table.appendChild(tb);
   $('#openingsTable').innerHTML=''; $('#openingsTable').appendChild(table);
 
+  // Store original example door values for comparison
+  const originalExamples = {
+    'Base - Sink': {width:762,height:610,doors:2},
+    'Upper - Left': {width:381,height:762,doors:1}
+  };
+
   $$('#openingsTable input, #openingsTable select').forEach(el=>{
     el.addEventListener('input', e=>{
       const id=e.target.getAttribute('data-id'); const key=e.target.getAttribute('data-key');
       const row=openings.find(o=>o.id===id); if(!row) return;
+      
+      // Store original values before modification
+      const originalName = row.name;
+      const originalWidth = row.width;
+      const originalHeight = row.height;
+      const originalDoors = row.doors;
+      
       if(key==='name'){row.name=e.target.value}
       else if(key==='doors'){row.doors=parseInt(e.target.value)||1}
       else if(key==='width'||key==='height'){
@@ -706,6 +759,28 @@ function renderOpenings(){
           displayEl.textContent=`${fmt(row[key]*factor, units)} ${units}`;
         }
       }
+      
+      // If this was an example door, check if it's been modified
+      if(row.isExample === true){
+        const original = originalExamples[row.name];
+        // Check if name changed or if dimensions/doors changed from original
+        const nameChanged = row.name !== originalName;
+        const dimensionsChanged = !original || 
+          Math.abs(row.width - original.width) > 0.01 || 
+          Math.abs(row.height - original.height) > 0.01 || 
+          row.doors !== original.doors;
+        
+        if(nameChanged || dimensionsChanged){
+          // Remove example flag since it's been modified
+          row.isExample = false;
+          // Re-render to update the display
+          renderOpenings();
+          computeAndRender();
+          return;
+        }
+      }
+      
+      saveToLocalStorage();
       computeAndRender();
     });
   });
@@ -713,22 +788,48 @@ function renderOpenings(){
     btn.addEventListener('click', e=>{
       const id=e.target.getAttribute('data-remove');
       openings=openings.filter(o=>o.id!==id);
+      saveToLocalStorage();
       renderOpenings(); computeAndRender();
     });
   });
 }
 
 $('#btnAddOpening').addEventListener('click', ()=>{
-  openings.push({id:uid(),name:'Opening',width:600,height:700,doors:1});
+  openings.push({id:uid(),name:'Opening',width:600,height:700,doors:1,isExample:false});
+  saveToLocalStorage();
   renderOpenings(); computeAndRender();
 });
 
-$$('#units, #hingeCupInset, #sideOverlay, #topBottomOverlay, #centerGap, #panelAllowance, #stileWidth, #topRailWidth, #bottomRailWidth, #tongueLength, #grooveDepth, #kerf, #endTrim, #stockLengths, #existing6ft63, #existing8ft63, #existing6ft89, #existing8ft89')
-  .forEach(el=>el.addEventListener('input', ()=>{ readParams(); computeAndRender(); }));
+$('#btnClearExceptExamples').addEventListener('click', ()=>{
+  if(confirm('Clear all doors except the example doors? This cannot be undone.')){
+    // Filter to keep only existing example doors
+    openings=openings.filter(o=>o.isExample===true);
+    
+    // Check if example doors need to be restored
+    const hasBaseSink = openings.some(o=>o.name==='Base - Sink' && o.isExample===true);
+    const hasUpperLeft = openings.some(o=>o.name==='Upper - Left' && o.isExample===true);
+    
+    // Restore missing example doors with original values
+    if(!hasBaseSink){
+      openings.push({id:uid(),name:'Base - Sink',width:762,height:610,doors:2,isExample:true});
+    }
+    if(!hasUpperLeft){
+      openings.push({id:uid(),name:'Upper - Left',width:381,height:762,doors:1,isExample:true});
+    }
+    
+    saveToLocalStorage();
+    renderOpenings(); computeAndRender();
+  }
+});
+
+$$('#units, #hingeCupInset, #sideOverlay, #topBottomOverlay, #centerGap, #panelAllowance, #stileWidth, #topRailWidth, #bottomRailWidth, #tongueLength, #grooveDepth, #kerf, #endTrim, #stockLengths, #existing6ft63, #existing8ft63, #existing6ft89, #existing8ft89, #panelStockOptions, #panelGrainMatters, #panelKerf')
+  .forEach(el=>el.addEventListener('input', ()=>{ readParams(); saveToLocalStorage(); computeAndRender(); }));
 
 function buildCutList(){
   const P=params; const items=[];
   for(const row of openings){
+    // Skip example doors - they should not appear in cut lists, board layouts, or stock recommendations
+    if(row.isExample === true) continue;
     const OW=row.width, OH=row.height, doors=row.doors;
     const OS=P.sideOverlay, OT=P.topBottomOverlay, CG=P.centerGap;
     const Wst=P.stileWidth, Wtop=P.topRailWidth, Wbot=P.bottomRailWidth;
@@ -752,6 +853,17 @@ function buildCutList(){
   return items;
 }
 
+function extractPanels(cutList){
+  // Extract panels from cut list - these are 2D pieces
+  return cutList.filter(c=>c.piece==='Panel').map(c => ({
+    width: c.cutWidth,
+    height: c.cutLength, // Panel height is stored as cutLength
+    label: `Panel – ${c.opening} ${c.doorLabel}`,
+    opening: c.opening,
+    doorLabel: c.doorLabel
+  }));
+}
+
 function linearParts(cutList){
   // Group pieces by width to avoid mixing different board widths
   const widthGroups = {};
@@ -772,6 +884,45 @@ function linearParts(cutList){
   return widthGroups;
 }
 
+function parsePanelStockOptions(optionsString, units){
+  // Parse panel stock options: "1220×2440 grain^, 914×2440 grain^"
+  // Returns array of {width, height, grainVertical, label}
+  if(!optionsString || !optionsString.trim()) return [];
+  
+  const stocks = [];
+  const factor = units === 'mm' ? 1 : mmPerInch;
+  const parts = optionsString.split(',');
+  
+  parts.forEach(part => {
+    part = part.trim();
+    if(!part) return;
+    
+    // Match: width×height grain^ or width×height grain→
+    const match = part.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*(?:grain\^|grain→|^|$)/i);
+    if(!match) return;
+    
+    const width = parseFloat(match[1]) * factor;
+    const height = parseFloat(match[2]) * factor;
+    const hasGrainMarker = /\bgrain\^/i.test(part);
+    const hasHorizontalGrain = /\bgrain→/i.test(part);
+    
+    // Default: if no grain marker, assume vertical (cabinet grain is vertical)
+    const grainVertical = hasHorizontalGrain ? false : (hasGrainMarker || true);
+    
+    const sizeLabel = units === 'mm' 
+      ? `${Math.round(width)}×${Math.round(height)}`
+      : `${(width/mmPerInch).toFixed(1)}"×${(height/mmPerInch).toFixed(1)}"`;
+    
+    stocks.push({
+      width, height, grainVertical,
+      label: `${sizeLabel} ${grainVertical ? 'grain^' : 'grain→'}`,
+      original: part
+    });
+  });
+  
+  return stocks;
+}
+
 function packBoards(items, stockLength, kerf, endTrim){
   const sorted=[...items].sort((a,b)=>b.length-a.length); const boards=[];
   for(const it of sorted){
@@ -787,6 +938,134 @@ function packBoards(items, stockLength, kerf, endTrim){
     b.waste=Math.max(0, stockLength-used);
   });
   return boards;
+}
+
+function packPanels(panels, stockOptions, grainMatters, kerf){
+  // 2D bin packing for panels
+  // panels: array of {width, height, label}
+  // stockOptions: array of {width, height, grainVertical, label}
+  // Returns array of {stock, panels, waste, efficiency}
+  
+  if(!stockOptions || stockOptions.length === 0 || panels.length === 0) return [];
+  
+  const packed = [];
+  const remaining = [...panels].sort((a,b)=>(b.width*b.height) - (a.width*a.height)); // Sort by area descending
+  
+  stockOptions.forEach(stock => {
+    const sheets = [];
+    let panelIndex = 0;
+    
+    while(panelIndex < remaining.length){
+      const sheet = {
+        stockWidth: stock.width,
+        stockHeight: stock.height,
+        cuts: [],
+        placed: []
+      };
+      
+      // Try to place remaining panels on this sheet
+      const toRemove = [];
+      
+      for(let i = 0; i < remaining.length; i++){
+        const panel = remaining[i];
+        
+        // Check if grain matters - cabinet grain is vertical, so panel height must align with stock height
+        let canRotate = !grainMatters || grainMatters === 'no';
+        
+        // Try normal orientation
+        let fits = false;
+        let rotated = false;
+        
+        if(panel.width + kerf <= sheet.stockWidth && panel.height + kerf <= sheet.stockHeight){
+          // Try placing this panel
+          let placed = false;
+          for(let y = kerf; y + panel.height + kerf <= sheet.stockHeight; y += 10){ // Try positions in 10mm increments
+            for(let x = kerf; x + panel.width + kerf <= sheet.stockWidth; x += 10){
+              // Check if this position conflicts with existing cuts
+              let conflict = false;
+              for(const cut of sheet.cuts){
+                if(!(x + panel.width + kerf <= cut.x || x >= cut.x + cut.width + kerf ||
+                     y + panel.height + kerf <= cut.y || y >= cut.y + cut.height + kerf)){
+                  conflict = true;
+                  break;
+                }
+              }
+              if(!conflict){
+                sheet.cuts.push({
+                  x, y, width: panel.width, height: panel.height,
+                  label: panel.label
+                });
+                sheet.placed.push(i);
+                placed = true;
+                fits = true;
+                break;
+              }
+            }
+            if(placed) break;
+          }
+        }
+        
+        // Try rotated orientation if grain doesn't matter and normal didn't work
+        if(!fits && canRotate && panel.height + kerf <= sheet.stockWidth && panel.width + kerf <= sheet.stockHeight){
+          for(let y = kerf; y + panel.width + kerf <= sheet.stockHeight; y += 10){
+            for(let x = kerf; x + panel.height + kerf <= sheet.stockWidth; x += 10){
+              let conflict = false;
+              for(const cut of sheet.cuts){
+                if(!(x + panel.height + kerf <= cut.x || x >= cut.x + cut.width + kerf ||
+                     y + panel.width + kerf <= cut.y || y >= cut.y + cut.height + kerf)){
+                  conflict = true;
+                  break;
+                }
+              }
+              if(!conflict){
+                sheet.cuts.push({
+                  x, y, width: panel.height, height: panel.width,
+                  label: `${panel.label} (rotated)`
+                });
+                sheet.placed.push(i);
+                fits = true;
+                rotated = true;
+                break;
+              }
+            }
+            if(fits) break;
+          }
+        }
+        
+        if(fits){
+          toRemove.push(i);
+        }
+      }
+      
+      // Remove placed panels from remaining list (in reverse order to maintain indices)
+      toRemove.sort((a,b)=>b-a).forEach(i => remaining.splice(i, 1));
+      
+      // Calculate waste
+      const usedArea = sheet.cuts.reduce((sum, cut) => sum + (cut.width * cut.height), 0);
+      const totalArea = sheet.stockWidth * sheet.stockHeight;
+      sheet.waste = totalArea - usedArea;
+      sheet.efficiency = ((usedArea / totalArea) * 100).toFixed(1);
+      
+      if(sheet.cuts.length > 0){
+        sheets.push(sheet);
+      }
+      
+      // If no panels were placed on this sheet, move to next stock option
+      if(sheet.placed.length === 0) break;
+    }
+    
+    if(sheets.length > 0){
+      packed.push({
+        stock: stock,
+        sheets: sheets,
+        totalSheets: sheets.length,
+        totalWaste: sheets.reduce((sum, s) => sum + s.waste, 0),
+        efficiency: sheets.reduce((sum, s) => sum + parseFloat(s.efficiency), 0) / sheets.length
+      });
+    }
+  });
+  
+  return packed;
 }
 
 function generateStockRecommendations(packs){
@@ -972,6 +1251,108 @@ function exportJSON(cutList,packs){
   const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='cabinet_plan.json'; a.click(); URL.revokeObjectURL(url);
 }
 
+function renderPanelLayouts(packedPanels){
+  const wrap=$('#panelBoardsWrap'); wrap.innerHTML='';
+  if(!packedPanels || packedPanels.length === 0){
+    const msg=document.createElement('div');
+    msg.style.padding='20px'; msg.style.textAlign='center'; msg.style.color='var(--muted)';
+    msg.textContent='No panel stock options configured. Add panel stock options in Fixed Parameters.';
+    wrap.appendChild(msg);
+    return;
+  }
+  
+  const units=params.units; const factor=(units==='mm')?1:(1/mmPerInch);
+  
+  packedPanels.forEach(pack=>{
+    const stock=pack.stock;
+    pack.sheets.forEach((sheet, sheetIdx)=>{
+      const card=document.createElement('div'); card.className='board';
+      const h3=document.createElement('h3');
+      h3.textContent=`Panel Sheet ${sheetIdx+1}: ${stock.label} — ${sheet.cuts.length} panel(s), ${sheet.efficiency}% efficient`;
+      card.appendChild(h3);
+      
+      const W=900,H=600,margin=20;
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      const scaleX=W/(sheet.stockWidth+2*margin);
+      const scaleY=H/(sheet.stockHeight+2*margin);
+      const scale=Math.min(scaleX, scaleY);
+      const viewW=sheet.stockWidth*scale+2*margin;
+      const viewH=sheet.stockHeight*scale+2*margin;
+      svg.setAttribute('viewBox',`0 0 ${viewW} ${viewH}`);
+      svg.setAttribute('preserveAspectRatio','xMinYMin meet');
+      svg.style.width='100%'; svg.style.height='auto';
+      
+      // Stock sheet outline
+      const stockRect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      stockRect.setAttribute('x',margin); stockRect.setAttribute('y',margin);
+      stockRect.setAttribute('width',sheet.stockWidth*scale);
+      stockRect.setAttribute('height',sheet.stockHeight*scale);
+      stockRect.setAttribute('fill','none');
+      stockRect.setAttribute('stroke','#334155');
+      stockRect.setAttribute('stroke-width','2');
+      svg.appendChild(stockRect);
+      
+      // Grain indicator
+      const grainLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+      grainLine.setAttribute('x1',margin+10);
+      grainLine.setAttribute('y1',margin+10);
+      grainLine.setAttribute('x2',margin+10);
+      grainLine.setAttribute('y2',margin+30);
+      grainLine.setAttribute('stroke',stock.grainVertical?'#4ade80':'#f59e0b');
+      grainLine.setAttribute('stroke-width','2');
+      svg.appendChild(grainLine);
+      const grainText=document.createElementNS('http://www.w3.org/2000/svg','text');
+      grainText.setAttribute('x',margin+15);
+      grainText.setAttribute('y',margin+25);
+      grainText.setAttribute('fill',stock.grainVertical?'#4ade80':'#f59e0b');
+      grainText.setAttribute('font-size','10px');
+      grainText.textContent=stock.grainVertical?'grain^':'grain→';
+      svg.appendChild(grainText);
+      
+      // Panel cuts
+      sheet.cuts.forEach(cut=>{
+        const cutRect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        cutRect.setAttribute('x',margin+cut.x*scale);
+        cutRect.setAttribute('y',margin+cut.y*scale);
+        cutRect.setAttribute('width',cut.width*scale);
+        cutRect.setAttribute('height',cut.height*scale);
+        cutRect.setAttribute('fill','#22d3ee');
+        cutRect.setAttribute('fill-opacity','0.3');
+        cutRect.setAttribute('stroke','#22d3ee');
+        cutRect.setAttribute('stroke-width','1.5');
+        svg.appendChild(cutRect);
+        
+        const label=document.createElementNS('http://www.w3.org/2000/svg','text');
+        label.setAttribute('x',margin+cut.x*scale+cut.width*scale/2);
+        label.setAttribute('y',margin+cut.y*scale+cut.height*scale/2);
+        label.setAttribute('fill','#d1d5db');
+        label.setAttribute('font-size','9px');
+        label.setAttribute('text-anchor','middle');
+        label.setAttribute('dominant-baseline','middle');
+        const labelText=cut.label.length>20?cut.label.substring(0,17)+'...':cut.label;
+        label.textContent=labelText;
+        svg.appendChild(label);
+        
+        // Dimensions
+        const dimText=document.createElementNS('http://www.w3.org/2000/svg','text');
+        dimText.setAttribute('x',margin+cut.x*scale+cut.width*scale/2);
+        dimText.setAttribute('y',margin+cut.y*scale+cut.height*scale/2+12);
+        dimText.setAttribute('fill','#f59e0b');
+        dimText.setAttribute('font-size','8px');
+        dimText.setAttribute('text-anchor','middle');
+        dimText.textContent=`${fmt(cut.width*factor,units)}×${fmt(cut.height*factor,units)}`;
+        svg.appendChild(dimText);
+      });
+      
+      const box=document.createElement('div');
+      box.className='svgwrap';
+      box.appendChild(svg);
+      card.appendChild(box);
+      wrap.appendChild(card);
+    });
+  });
+}
+
 function computeAndRender(){
   readParams();
   updateUnitDisplays();
@@ -998,6 +1379,12 @@ function computeAndRender(){
 
   renderBoardsSVG(packs);
 
+  // Process panels
+  const panels = extractPanels(cutList);
+  const panelStockOptions = parsePanelStockOptions(params.panelStockOptions, params.units);
+  const packedPanels = packPanels(panels, panelStockOptions, params.panelGrainMatters, params.panelKerf);
+  renderPanelLayouts(packedPanels);
+
   // Add stock recommendations to the cut list container for printing
   const stockRecs = renderStockRecommendations(packs);
   $('#cutListTable').appendChild(stockRecs);
@@ -1011,6 +1398,71 @@ function calculateEfficiency(pack){
   const totalWaste = pack.boards.reduce((sum, board) => sum + board.waste, 0);
   const totalUsed = pack.boards.reduce((sum, board) => sum + (pack.stockLength - board.waste), 0);
   return (totalUsed / (totalBoards * pack.stockLength)) * 100;
+}
+
+// LocalStorage functions
+function saveToLocalStorage(){
+  try{
+    localStorage.setItem('cabinetDoorParams', JSON.stringify(params));
+    localStorage.setItem('cabinetDoorOpenings', JSON.stringify(openings));
+  }catch(e){
+    console.warn('Failed to save to localStorage:', e);
+  }
+}
+
+function loadFromLocalStorage(){
+  try{
+    const savedParams=localStorage.getItem('cabinetDoorParams');
+    const savedOpenings=localStorage.getItem('cabinetDoorOpenings');
+    
+    if(savedParams){
+      const loaded=JSON.parse(savedParams);
+      // Merge loaded params with defaults to handle missing fields
+      Object.assign(params, loaded);
+      // Update UI fields
+      $('#units').value=params.units || 'mm';
+      $('#hingeCupInset').value=params.hingeCupInset || 5;
+      $('#sideOverlay').value=params.sideOverlay || 14;
+      $('#topBottomOverlay').value=params.topBottomOverlay || 14;
+      $('#centerGap').value=params.centerGap || 3;
+      $('#panelAllowance').value=params.panelAllowance || 0.8;
+      $('#stileWidth').value=params.stileWidth || 63;
+      $('#topRailWidth').value=params.topRailWidth || 63;
+      $('#bottomRailWidth').value=params.bottomRailWidth || 89;
+      $('#tongueLength').value=params.tongueLength || 12.7;
+      $('#grooveDepth').value=params.grooveDepth || 12.7;
+      $('#kerf').value=params.kerf || 3.2;
+      $('#endTrim').value=params.endTrim || 25;
+      $('#stockLengths').value=params.stockLengths ? params.stockLengths.join(',') : '1829,2438';
+      $('#existing6ft63').value=params.existing6ft63 || 0;
+      $('#existing8ft63').value=params.existing8ft63 || 0;
+      $('#existing6ft89').value=params.existing6ft89 || 0;
+      $('#existing8ft89').value=params.existing8ft89 || 0;
+      $('#panelStockOptions').value=params.panelStockOptions || '';
+      $('#panelGrainMatters').value=params.panelGrainMatters || 'yes';
+      $('#panelKerf').value=params.panelKerf || params.kerf || 3.2;
+    }
+    
+    if(savedOpenings){
+      const loaded=JSON.parse(savedOpenings);
+      // Ensure we keep example doors with isExample flag
+      const exampleIds=['Base - Sink','Upper - Left'];
+      loaded.forEach(o=>{
+        if(!o.hasOwnProperty('isExample')){
+          o.isExample=exampleIds.includes(o.name);
+        }
+      });
+      // If no examples exist in loaded data, restore them
+      const hasExamples=loaded.some(o=>o.isExample);
+      if(!hasExamples){
+        loaded.unshift({id:uid(),name:'Base - Sink',width:762,height:610,doors:2,isExample:true});
+        loaded.unshift({id:uid(),name:'Upper - Left',width:381,height:762,doors:1,isExample:true});
+      }
+      openings=loaded;
+    }
+  }catch(e){
+    console.warn('Failed to load from localStorage:', e);
+  }
 }
 
 // Print functions for different modes
@@ -1050,6 +1502,8 @@ function printBoardLayoutsOnly(){
   }, 100);
 }
 
+// Load from localStorage on page load
+loadFromLocalStorage();
 renderOpenings(); computeAndRender();
 </script>
 </body>
