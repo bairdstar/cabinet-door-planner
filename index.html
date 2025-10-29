@@ -85,12 +85,12 @@
     p,div,span{color:black !important}
 
     /* Landscape ONLY for board layouts - proper print styles */
-    .board{page-break-before:always; page-break-after:always}
+    .board{page-break-inside:avoid; page-break-after:auto}
     .board svg{page-break-inside:avoid}
 
-    /* Board layouts only mode - hide everything except board layouts */
+    /* Board layouts only mode - hide everything except board and panel layouts */
     body.print-boards-only header,
-    body.print-boards-only .card:not(:has(#boardsWrap)){
+    body.print-boards-only .card:not(:has(#boardsWrap)):not(:has(#panelBoardsWrap)){
       display:none !important;
     }
     body.print-boards-only .wrap{
@@ -110,6 +110,15 @@
     body.print-boards-only{
       padding:10px;
       margin:0;
+    }
+    /* Show card titles for Board and Panel Layout sections */
+    body.print-boards-only .card h2{
+      font-size:18px;
+      font-weight:bold;
+      margin-bottom:15px;
+      padding:10px;
+      background:#f0f0f0 !important;
+      border-bottom:2px solid #333 !important;
     }
     /* Optimize board display for landscape */
     body.print-boards-only .board h3{
@@ -137,7 +146,7 @@
     <button class="btn" id="btnExportCSV">Export CSV</button>
     <button class="btn" id="btnExportJSON">Export JSON</button>
     <button class="btn primary" onclick="printFullProject()">Print Full Project</button>
-    <button class="btn primary" onclick="printBoardLayoutsOnly()">Print Board Layouts</button>
+    <button class="btn primary" onclick="printBoardLayoutsOnly()">Print Cutting Layouts</button>
   </div>
 </header>
 
@@ -343,7 +352,42 @@
 const mmPerInch=25.4; const $=(s)=>document.querySelector(s); const $$=(s)=>Array.from(document.querySelectorAll(s));
 function uid(){return Math.random().toString(36).slice(2)}
 function parseNumsCSV(s){return s.split(',').map(v=>parseFloat(v.trim())).filter(v=>!isNaN(v)&&v>0)}
-function fmt(n,u){return u==='mm'?n.toFixed(1):n.toFixed(3)}
+function fmtInches(n){
+  // Convert decimal inches to fractional inches with 1/16 precision
+  // Returns format like "2 3/16" or "2 3/16+" or "2 3/16-"
+  const whole = Math.floor(n);
+  const fraction = n - whole;
+  
+  // Convert to 16ths - find nearest 1/16
+  const exactSixteenths = fraction * 16;
+  const sixteenths = Math.round(exactSixteenths);
+  const remainder = exactSixteenths - sixteenths;
+  
+  // Check if slightly off 1/16 boundary (within 1/128 tolerance, or ~0.008")
+  const tolerance = 1/128;
+  let indicator = '';
+  if(Math.abs(remainder) > tolerance){
+    indicator = remainder > 0 ? '+' : '-';
+  }
+  
+  // Build fraction string
+  if(sixteenths === 0){
+    return whole === 0 ? '0"' : `${whole}"`;
+  }
+  
+  // Simplify fraction if possible (e.g., 4/16 -> 1/4, 8/16 -> 1/2)
+  let num = sixteenths;
+  let den = 16;
+  const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+  const divisor = gcd(Math.abs(num), den);
+  num = num / divisor;
+  den = den / divisor;
+  
+  const fractionStr = den === 1 ? `${num}` : `${num}/${den}`;
+  return whole === 0 ? `${fractionStr}"${indicator}` : `${whole} ${fractionStr}"${indicator}`;
+}
+
+function fmt(n,u){return u==='mm'?n.toFixed(1):fmtInches(n)}
 
 let params={units:'mm',hingeCupInset:5,sideOverlay:14,topBottomOverlay:14,centerGap:3,panelAllowance:0.8,
             stileWidth:63,topRailWidth:63,bottomRailWidth:89,tongueLength:12.7,grooveDepth:12.7,
@@ -353,28 +397,147 @@ let params={units:'mm',hingeCupInset:5,sideOverlay:14,topBottomOverlay:14,center
 let openings=[{id:uid(),name:'Base - Sink',width:762,height:610,doors:2,isExample:true},
               {id:uid(),name:'Upper - Left',width:381,height:762,doors:1,isExample:true}];
 
+function convertUnits(fromUnits, toUnits){
+  // All values are stored internally in mm - convert display/input only
+  // When switching units, we convert the UI values but keep internal storage in mm
+  
+  if(fromUnits === toUnits) return; // No conversion needed
+  
+  // CRITICAL: First save current input values to params in mm before converting display
+  // Temporarily set units back to fromUnits so readParams() reads correctly
+  const unitsEl = $('#units');
+  const savedUnitsValue = unitsEl.value;
+  unitsEl.value = fromUnits;
+  params.units = fromUnits;
+  readParams();
+  // Restore the new units setting
+  unitsEl.value = toUnits;
+  
+  // Now update input fields to show converted values
+  // All internal storage remains in mm - values in params are already in mm
+  const paramFields = [
+    'hingeCupInset', 'sideOverlay', 'topBottomOverlay', 'centerGap', 'panelAllowance',
+    'stileWidth', 'topRailWidth', 'bottomRailWidth', 'tongueLength', 'grooveDepth',
+    'kerf', 'endTrim', 'panelKerf'
+  ];
+  
+  paramFields.forEach(field => {
+    // Values in params are stored in mm, convert to display units
+    const valueInMm = params[field];
+    if(valueInMm !== undefined && valueInMm !== null && !isNaN(valueInMm) && valueInMm > 0){
+      const displayValue = toUnits === 'mm' ? valueInMm : valueInMm * (1 / mmPerInch);
+      const el = $(`#${field}`);
+      if(el){
+        // For inches, show decimal (user can still edit as decimal)
+        // The display label will show fractional format via updateUnitDisplays()
+        el.value = displayValue.toFixed(toUnits === 'mm' ? 1 : 4);
+      }
+    }
+  });
+  
+  // Convert stock lengths display (stored as mm, display in chosen units)
+  const stockLengthsEl = $('#stockLengths');
+  if(stockLengthsEl){
+    const lengths = params.stockLengths || [];
+    const displayLengths = lengths.map(l => {
+      const display = toUnits === 'mm' ? l : l * (1 / mmPerInch);
+      return toUnits === 'mm' ? Math.round(display) : display.toFixed(3);
+    });
+    stockLengthsEl.value = displayLengths.join(',');
+  }
+  
+  // Convert panel stock options display
+  const panelStockEl = $('#panelStockOptions');
+  if(panelStockEl && params.panelStockOptions){
+    // Parse and reconvert - values in stored string might be in old units
+    // We need to parse them assuming they were in the FROM unit, then display in TO unit
+    const parts = params.panelStockOptions.split(',');
+    const convertedParts = parts.map(part => {
+      part = part.trim();
+      if(!part) return '';
+      
+      // Match: width×height grain^ or width×height grain→
+      const match = part.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*(grain\^|grain→)?/i);
+      if(match){
+        // Parse the values as if they were in FROM units
+        let width = parseFloat(match[1]);
+        let height = parseFloat(match[2]);
+        
+        // If fromUnits was inches, convert to mm first
+        if(fromUnits === 'in'){
+          width = width * mmPerInch;
+          height = height * mmPerInch;
+        }
+        // Now convert to display units
+        if(toUnits === 'in'){
+          width = width * (1 / mmPerInch);
+          height = height * (1 / mmPerInch);
+        }
+        
+        const grain = match[3] || '';
+        return `${toUnits === 'mm' ? Math.round(width) : width.toFixed(3)}×${toUnits === 'mm' ? Math.round(height) : height.toFixed(3)}${grain ? ' ' + grain : ''}`;
+      }
+      return part;
+    });
+    panelStockEl.value = convertedParts.filter(p => p).join(', ');
+    // Update params with the converted string
+    params.panelStockOptions = panelStockEl.value;
+  }
+  
+  // Opening dimensions are already stored in mm in the openings array
+  // Just need to re-render to show converted display values
+  // No need to convert the internal values since they're already in mm
+  
+  // Update params.units to new units (values in params remain in mm)
+  params.units = toUnits;
+  
+  // Re-render openings table to show converted values in inputs
+  renderOpenings();
+  
+  // Update unit display labels to show fractional inches
+  updateUnitDisplays();
+}
+
 function readParams(){
   params.units=$('#units').value;
-  params.hingeCupInset=parseFloat($('#hingeCupInset').value)||0;
-  params.sideOverlay=parseFloat($('#sideOverlay').value)||0;
-  params.topBottomOverlay=parseFloat($('#topBottomOverlay').value)||0;
-  params.centerGap=parseFloat($('#centerGap').value)||0;
-  params.panelAllowance=parseFloat($('#panelAllowance').value)||0;
-  params.stileWidth=parseFloat($('#stileWidth').value)||0;
-  params.topRailWidth=parseFloat($('#topRailWidth').value)||0;
-  params.bottomRailWidth=parseFloat($('#bottomRailWidth').value)||0;
-  params.tongueLength=parseFloat($('#tongueLength').value)||0;
-  params.grooveDepth=parseFloat($('#grooveDepth').value)||0;
-  params.kerf=parseFloat($('#kerf').value)||0;
-  params.endTrim=parseFloat($('#endTrim').value)||0;
-  params.stockLengths=parseNumsCSV($('#stockLengths').value);
+  const units = params.units;
+  
+  // Read input values (in display units) and convert to mm for storage
+  const readValue = (elId) => {
+    const el = $(`#${elId}`);
+    if(!el) return 0;
+    const displayValue = parseFloat(el.value)||0;
+    // Convert to mm if currently in inches
+    return units === 'mm' ? displayValue : displayValue * mmPerInch;
+  };
+  
+  params.hingeCupInset = readValue('hingeCupInset');
+  params.sideOverlay = readValue('sideOverlay');
+  params.topBottomOverlay = readValue('topBottomOverlay');
+  params.centerGap = readValue('centerGap');
+  params.panelAllowance = readValue('panelAllowance');
+  params.stileWidth = readValue('stileWidth');
+  params.topRailWidth = readValue('topRailWidth');
+  params.bottomRailWidth = readValue('bottomRailWidth');
+  params.tongueLength = readValue('tongueLength');
+  params.grooveDepth = readValue('grooveDepth');
+  params.kerf = readValue('kerf');
+  params.endTrim = readValue('endTrim');
+  
+  // Stock lengths - convert to mm
+  const stockLengthsDisplay = parseNumsCSV($('#stockLengths').value);
+  params.stockLengths = stockLengthsDisplay.map(l => units === 'mm' ? l : l * mmPerInch);
+  
+  // Existing counts are unitless
   params.existing6ft63=parseInt($('#existing6ft63').value)||0;
   params.existing8ft63=parseInt($('#existing8ft63').value)||0;
   params.existing6ft89=parseInt($('#existing6ft89').value)||0;
   params.existing8ft89=parseInt($('#existing8ft89').value)||0;
+  
+  // Panel stock options stored as string (will be parsed when needed)
   params.panelStockOptions=$('#panelStockOptions').value;
   params.panelGrainMatters=$('#panelGrainMatters').value;
-  params.panelKerf=parseFloat($('#panelKerf').value)||params.kerf;
+  params.panelKerf = readValue('panelKerf') || params.kerf;
 }
 
 function updateUnitDisplays(){
@@ -708,13 +871,13 @@ function renderOpenings(){
       <td><div style="display:flex; align-items:center"><input type="text" value="${row.name}" data-id="${row.id}" data-key="name" style="flex:1">${exampleTag}</div></td>
       <td>
         <div style="display:flex; gap:8px; align-items:center">
-          <input type="number" step="0.1" value="${row.width}" data-id="${row.id}" data-key="width" style="flex:1; width:auto">
+          <input type="number" step="0.1" value="${row.width * (units==='mm'?1:(1/mmPerInch))}" data-id="${row.id}" data-key="width" style="flex:1; width:auto">
           <div class="unit-display" data-id="${row.id}" data-key="widthDisplay" style="min-width:70px">${fmt(row.width * (units==='mm'?1:(1/mmPerInch)), units)} ${units}</div>
         </div>
       </td>
       <td>
         <div style="display:flex; gap:8px; align-items:center">
-          <input type="number" step="0.1" value="${row.height}" data-id="${row.id}" data-key="height" style="flex:1; width:auto">
+          <input type="number" step="0.1" value="${row.height * (units==='mm'?1:(1/mmPerInch))}" data-id="${row.id}" data-key="height" style="flex:1; width:auto">
           <div class="unit-display" data-id="${row.id}" data-key="heightDisplay" style="min-width:70px">${fmt(row.height * (units==='mm'?1:(1/mmPerInch)), units)} ${units}</div>
         </div>
       </td>
@@ -750,11 +913,14 @@ function renderOpenings(){
       if(key==='name'){row.name=e.target.value}
       else if(key==='doors'){row.doors=parseInt(e.target.value)||1}
       else if(key==='width'||key==='height'){
-        row[key]=parseFloat(e.target.value)||0;
+        // User enters value in current display units, convert to mm for storage
+        const inputValue = parseFloat(e.target.value)||0;
+        const units = params.units;
+        // Convert to mm for storage (all internal values in mm)
+        row[key] = units === 'mm' ? inputValue : inputValue * mmPerInch;
         // Update the unit display
         const displayEl=$(e.target.parentElement.querySelector(`[data-key="${key}Display"]`));
         if(displayEl){
-          const units=params.units;
           const factor=(units==='mm')?1:(1/mmPerInch);
           displayEl.textContent=`${fmt(row[key]*factor, units)} ${units}`;
         }
@@ -822,7 +988,22 @@ $('#btnClearExceptExamples').addEventListener('click', ()=>{
   }
 });
 
-$$('#units, #hingeCupInset, #sideOverlay, #topBottomOverlay, #centerGap, #panelAllowance, #stileWidth, #topRailWidth, #bottomRailWidth, #tongueLength, #grooveDepth, #kerf, #endTrim, #stockLengths, #existing6ft63, #existing8ft63, #existing6ft89, #existing8ft89, #panelStockOptions, #panelGrainMatters, #panelKerf')
+// Handle units change separately to convert values
+$('#units').addEventListener('change', ()=>{
+  const newUnits = $('#units').value;
+  const oldUnits = params.units;
+  
+  if(newUnits !== oldUnits){
+    convertUnits(oldUnits, newUnits);
+    // convertUnits already updates input fields, renderOpenings, and updateUnitDisplays
+    // params.units is already set in convertUnits
+    saveToLocalStorage(); 
+    computeAndRender();
+  }
+});
+
+// Handle other parameter changes
+$$('#hingeCupInset, #sideOverlay, #topBottomOverlay, #centerGap, #panelAllowance, #stileWidth, #topRailWidth, #bottomRailWidth, #tongueLength, #grooveDepth, #kerf, #endTrim, #stockLengths, #existing6ft63, #existing8ft63, #existing6ft89, #existing8ft89, #panelStockOptions, #panelGrainMatters, #panelKerf')
   .forEach(el=>el.addEventListener('input', ()=>{ readParams(); saveToLocalStorage(); computeAndRender(); }));
 
 function buildCutList(){
@@ -1469,42 +1650,105 @@ function loadFromLocalStorage(){
     
     if(savedParams){
       const loaded=JSON.parse(savedParams);
-      // Merge loaded params with defaults to handle missing fields
-      Object.assign(params, loaded);
-      // Update UI fields
-      $('#units').value=params.units || 'mm';
-      $('#hingeCupInset').value=params.hingeCupInset || 5;
-      $('#sideOverlay').value=params.sideOverlay || 14;
-      $('#topBottomOverlay').value=params.topBottomOverlay || 14;
-      $('#centerGap').value=params.centerGap || 3;
-      $('#panelAllowance').value=params.panelAllowance || 0.8;
-      $('#stileWidth').value=params.stileWidth || 63;
-      $('#topRailWidth').value=params.topRailWidth || 63;
-      $('#bottomRailWidth').value=params.bottomRailWidth || 89;
-      $('#tongueLength').value=params.tongueLength || 12.7;
-      $('#grooveDepth').value=params.grooveDepth || 12.7;
-      $('#kerf').value=params.kerf || 3.2;
-      $('#endTrim').value=params.endTrim || 25;
-      $('#stockLengths').value=params.stockLengths ? params.stockLengths.join(',') : '1829,2438';
-      $('#existing6ft63').value=params.existing6ft63 || 0;
-      $('#existing8ft63').value=params.existing8ft63 || 0;
-      $('#existing6ft89').value=params.existing6ft89 || 0;
-      $('#existing8ft89').value=params.existing8ft89 || 0;
-      $('#panelStockOptions').value=params.panelStockOptions || '';
-      $('#panelGrainMatters').value=params.panelGrainMatters || 'yes';
-      $('#panelKerf').value=params.panelKerf || params.kerf || 3.2;
+      const savedUnits = loaded.units || 'mm';
+      
+      // Convert old saved values to mm if they were saved in inches
+      // (For backwards compatibility with old saves)
+      const conversionToMm = savedUnits === 'in' ? mmPerInch : 1;
+      
+      // Merge loaded params, converting to mm if needed
+      params.units = loaded.units || 'mm';
+      params.hingeCupInset = (loaded.hingeCupInset || 5) * conversionToMm;
+      params.sideOverlay = (loaded.sideOverlay || 14) * conversionToMm;
+      params.topBottomOverlay = (loaded.topBottomOverlay || 14) * conversionToMm;
+      params.centerGap = (loaded.centerGap || 3) * conversionToMm;
+      params.panelAllowance = (loaded.panelAllowance || 0.8) * conversionToMm;
+      params.stileWidth = (loaded.stileWidth || 63) * conversionToMm;
+      params.topRailWidth = (loaded.topRailWidth || 63) * conversionToMm;
+      params.bottomRailWidth = (loaded.bottomRailWidth || 89) * conversionToMm;
+      params.tongueLength = (loaded.tongueLength || 12.7) * conversionToMm;
+      params.grooveDepth = (loaded.grooveDepth || 12.7) * conversionToMm;
+      params.kerf = (loaded.kerf || 3.2) * conversionToMm;
+      params.endTrim = (loaded.endTrim || 25) * conversionToMm;
+      params.stockLengths = loaded.stockLengths ? loaded.stockLengths.map(l => l * conversionToMm) : [1829,2438];
+      params.existing6ft63 = loaded.existing6ft63 || 0;
+      params.existing8ft63 = loaded.existing8ft63 || 0;
+      params.existing6ft89 = loaded.existing6ft89 || 0;
+      params.existing8ft89 = loaded.existing8ft89 || 0;
+      params.panelStockOptions = loaded.panelStockOptions || '';
+      params.panelGrainMatters = loaded.panelGrainMatters || 'yes';
+      params.panelKerf = (loaded.panelKerf || loaded.kerf || 3.2) * conversionToMm;
+      
+      // Set current units preference
+      $('#units').value = params.units || 'mm';
+      
+      // Display values in current units (values stored in mm)
+      const currentUnits = params.units;
+      const displayFactor = currentUnits === 'mm' ? 1 : (1 / mmPerInch);
+      
+      $('#hingeCupInset').value = (params.hingeCupInset * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#sideOverlay').value = (params.sideOverlay * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#topBottomOverlay').value = (params.topBottomOverlay * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#centerGap').value = (params.centerGap * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#panelAllowance').value = (params.panelAllowance * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#stileWidth').value = (params.stileWidth * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#topRailWidth').value = (params.topRailWidth * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#bottomRailWidth').value = (params.bottomRailWidth * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#tongueLength').value = (params.tongueLength * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#grooveDepth').value = (params.grooveDepth * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#kerf').value = (params.kerf * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#endTrim').value = (params.endTrim * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      $('#stockLengths').value = params.stockLengths.map(l => {
+        const display = l * displayFactor;
+        return currentUnits === 'mm' ? Math.round(display) : display.toFixed(3);
+      }).join(',');
+      $('#panelKerf').value = (params.panelKerf * displayFactor).toFixed(currentUnits === 'mm' ? 1 : 3);
+      
+      // Panel stock options - need special handling
+      if(params.panelStockOptions){
+        // If saved units were inches, convert the string values
+        if(savedUnits === 'in'){
+          const parts = params.panelStockOptions.split(',');
+          const convertedParts = parts.map(part => {
+            part = part.trim();
+            if(!part) return '';
+            const match = part.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*(grain\^|grain→)?/i);
+            if(match){
+              const width = parseFloat(match[1]) * mmPerInch;
+              const height = parseFloat(match[2]) * mmPerInch;
+              const grain = match[3] || '';
+              const displayWidth = width * displayFactor;
+              const displayHeight = height * displayFactor;
+              return `${currentUnits === 'mm' ? Math.round(displayWidth) : displayWidth.toFixed(3)}×${currentUnits === 'mm' ? Math.round(displayHeight) : displayHeight.toFixed(3)}${grain ? ' ' + grain : ''}`;
+            }
+            return part;
+          });
+          params.panelStockOptions = convertedParts.filter(p => p).join(', ');
+        }
+      }
+      $('#panelStockOptions').value = params.panelStockOptions || '';
+      $('#panelGrainMatters').value = params.panelGrainMatters || 'yes';
     }
     
     if(savedOpenings){
       const loaded=JSON.parse(savedOpenings);
+      const savedUnits = params.units || 'mm';
+      
+      // Convert opening dimensions to mm if they were saved in inches
+      // (For backwards compatibility)
+      const conversionToMm = savedUnits === 'in' ? mmPerInch : 1;
+      
       // Ensure we keep example doors with isExample flag
       const exampleIds=['Base - Sink','Upper - Left'];
       loaded.forEach(o=>{
         if(!o.hasOwnProperty('isExample')){
           o.isExample=exampleIds.includes(o.name);
         }
+        // Convert dimensions to mm if they were saved in inches
+        o.width = (o.width || 0) * conversionToMm;
+        o.height = (o.height || 0) * conversionToMm;
       });
-      // If no examples exist in loaded data, restore them
+      // If no examples exist in loaded data, restore them (already in mm)
       const hasExamples=loaded.some(o=>o.isExample);
       if(!hasExamples){
         loaded.unshift({id:uid(),name:'Base - Sink',width:762,height:610,doors:2,isExample:true});

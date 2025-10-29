@@ -106,9 +106,11 @@ Two print options are available:
    - Board Layout diagrams
    - Mixed portrait/landscape orientation as needed
 
-2. **Print Board Layouts** - Board cutting diagrams only:
+2. **Print Cutting Layouts** - Board and panel cutting diagrams only:
    - **Landscape orientation** for optimal viewing
-   - Multiple boards per page when possible
+   - Includes both linear board layouts (stiles/rails) and 2D panel layouts
+   - Multiple boards per page when space allows
+   - Clear section headers for "Board Layout" and "Panel Layout"
    - Ideal for shop floor use
    - Excludes all other project information
 
@@ -168,11 +170,13 @@ README.md                   # This documentation
 - Allow for end trim on each board
 
 ### **Printing**
-- **Use "Print Board Layouts"** for shop floor cutting diagrams (automatic landscape)
+- **Use "Print Cutting Layouts"** for shop floor cutting diagrams (automatic landscape)
+  - Includes both board layouts (stiles/rails) and panel layouts (2D sheets)
+  - Clear section headers separate the two layout types
 - **Use "Print Full Project"** for complete documentation with all calculations
 - Print on white paper for best visibility
 - Consider laminating shop copies for durability
-- Board layouts will fit multiple boards per page when space allows
+- Layouts will fit multiple items per page when space allows
 
 ## Troubleshooting
 
