@@ -585,8 +585,10 @@ function readParams(){
     const el = $(`#${elId}`);
     if(!el) return 0;
     const displayValue = parseFloat(el.value)||0;
-    // Convert to mm if currently in inches
-    return units === 'mm' ? displayValue : displayValue * mmPerInch;
+    // Convert to mm if currently in inches, round to avoid floating point drift
+    // Round to 4 decimal places (0.0001mm = ~0.000004" precision, more than sufficient)
+    const mmValue = units === 'mm' ? displayValue : displayValue * mmPerInch;
+    return Math.round(mmValue * 10000) / 10000;
   };
   
   params.hingeCupInset = readValue('hingeCupInset');
@@ -602,9 +604,12 @@ function readParams(){
   params.kerf = readValue('kerf');
   params.endTrim = readValue('endTrim');
   
-  // Stock lengths - convert to mm
+  // Stock lengths - convert to mm with rounding
   const stockLengthsDisplay = parseNumsCSV($('#stockLengths').value);
-  params.stockLengths = stockLengthsDisplay.map(l => units === 'mm' ? l : l * mmPerInch);
+  params.stockLengths = stockLengthsDisplay.map(l => {
+    const mmValue = units === 'mm' ? l : l * mmPerInch;
+    return Math.round(mmValue * 10000) / 10000;
+  });
   
   // Existing counts are unitless
   params.existing6ft63=parseInt($('#existing6ft63').value)||0;
@@ -994,8 +999,9 @@ function renderOpenings(){
         // User enters value in current display units, convert to mm for storage
         const inputValue = parseFloat(e.target.value)||0;
         const units = params.units;
-        // Convert to mm for storage (all internal values in mm)
-        row[key] = units === 'mm' ? inputValue : inputValue * mmPerInch;
+        // Convert to mm for storage (all internal values in mm), round to avoid floating point drift
+        const mmValue = units === 'mm' ? inputValue : inputValue * mmPerInch;
+        row[key] = Math.round(mmValue * 10000) / 10000;
         // Update the unit display
         const displayEl=$(e.target.parentElement.querySelector(`[data-key="${key}Display"]`));
         if(displayEl){
@@ -1534,7 +1540,7 @@ function renderBoardsSVG(packs){
         r.setAttribute('rx',4); r.setAttribute('ry',4); r.setAttribute('class','cutRect'); svg.appendChild(r);
         const text=document.createElementNS('http://www.w3.org/2000/svg','text');
         text.setAttribute('x',x+4); text.setAttribute('y',y+12); text.setAttribute('class','cutLabel');
-        text.textContent=`${c.label} • ${fmt(c.length,'mm')} mm`; svg.appendChild(text);
+        text.textContent=`${c.label} • ${fmt(c.length*factor, units)}${units === 'in' ? '' : ' ' + units}`; svg.appendChild(text);
         pos += c.length;
         if(i<b.cuts.length-1){
           const kx=margin + scaleX(pos);
@@ -1546,7 +1552,7 @@ function renderBoardsSVG(packs){
       });
       const t=document.createElementNS('http://www.w3.org/2000/svg','text');
       t.setAttribute('x',margin); t.setAttribute('y',y-10); t.setAttribute('class','cutLabel');
-      t.textContent=`Board ${idx+1} • Waste: ${fmt(b.waste,'mm')} mm`; svg.appendChild(t);
+      t.textContent=`Board ${idx+1} • Waste: ${fmt(b.waste*factor, units)}${units === 'in' ? '' : ' ' + units}`; svg.appendChild(t);
     });
     const box=document.createElement('div'); box.className='svgwrap'; box.appendChild(svg); card.appendChild(box); wrap.appendChild(card);
   });
