@@ -633,7 +633,7 @@ function readParams(){
 function updateUnitDisplays(){
   const units=params.units;
   const factor=(units==='mm')?1:(1/mmPerInch);
-  
+
   const displays=[
     {id:'hingeCupInsetDisplay', value:params.hingeCupInset},
     {id:'sideOverlayDisplay', value:params.sideOverlay},
@@ -649,10 +649,14 @@ function updateUnitDisplays(){
     {id:'endTrimDisplay', value:params.endTrim},
     {id:'panelKerfDisplay', value:params.panelKerf}
   ];
-  
+
   displays.forEach(d=>{
     const el=$(`#${d.id}`);
-    if(el) el.textContent=`${fmt(d.value*factor, units)} ${units}`;
+    if(el){
+      // Show fractional display alongside decimal input for reference
+      el.textContent=`${fmt(d.value*factor, units)}`;
+      el.style.display = '';
+    }
   });
   
   // Update opening table unit displays
@@ -662,7 +666,7 @@ function updateUnitDisplays(){
     const row=openings.find(o=>o.id===id);
     if(row){
       const valueKey=key.replace('Display','');
-      el.textContent=`${fmt(row[valueKey]*factor, units)} ${units}`;
+      el.textContent=`${fmt(row[valueKey]*factor, units)}`;
     }
   });
 }
