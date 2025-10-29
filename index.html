@@ -949,13 +949,19 @@ function packPanels(panels, stockOptions, grainMatters, kerf){
   if(!stockOptions || stockOptions.length === 0 || panels.length === 0) return [];
   
   const packed = [];
-  const remaining = [...panels].sort((a,b)=>(b.width*b.height) - (a.width*a.height)); // Sort by area descending
+  let remaining = [...panels].sort((a,b)=>(b.width*b.height) - (a.width*a.height)); // Sort by area descending
   
   stockOptions.forEach(stock => {
     const sheets = [];
-    let panelIndex = 0;
+    // Work with a copy of remaining panels for this stock option
+    // Capture remaining at the start - panels will be removed as they're placed
+    const stockRemaining = remaining.filter(p => {
+      // Make sure this panel wasn't already placed in a previous stock option
+      return true; // All panels in remaining should be unplaced
+    }).map(p => ({...p})); // Deep copy to avoid reference issues
     
-    while(panelIndex < remaining.length){
+    // Try to pack remaining panels onto sheets of this stock size
+    while(stockRemaining.length > 0){
       const sheet = {
         stockWidth: stock.width,
         stockHeight: stock.height,
@@ -964,24 +970,26 @@ function packPanels(panels, stockOptions, grainMatters, kerf){
       };
       
       // Try to place remaining panels on this sheet
+      const canRotate = !grainMatters || grainMatters === 'no';
       const toRemove = [];
       
-      for(let i = 0; i < remaining.length; i++){
-        const panel = remaining[i];
+      // Make multiple passes when rotation is allowed to try different strategies
+      let passNumber = 0;
+      const maxPasses = canRotate ? 2 : 1;
+      
+      while(passNumber < maxPasses && stockRemaining.length > 0){
+        const passToRemove = [];
         
-        // Check if grain matters - cabinet grain is vertical, so panel height must align with stock height
-        let canRotate = !grainMatters || grainMatters === 'no';
+        for(let i = 0; i < stockRemaining.length; i++){
+        const panel = stockRemaining[i];
+        
+        // Try both orientations if grain doesn't matter - collect ALL valid positions for both
+        let validPositions = [];
         
         // Try normal orientation
-        let fits = false;
-        let rotated = false;
-        
         if(panel.width + kerf <= sheet.stockWidth && panel.height + kerf <= sheet.stockHeight){
-          // Try placing this panel
-          let placed = false;
-          for(let y = kerf; y + panel.height + kerf <= sheet.stockHeight; y += 10){ // Try positions in 10mm increments
+          for(let y = kerf; y + panel.height + kerf <= sheet.stockHeight; y += 10){
             for(let x = kerf; x + panel.width + kerf <= sheet.stockWidth; x += 10){
-              // Check if this position conflicts with existing cuts
               let conflict = false;
               for(const cut of sheet.cuts){
                 if(!(x + panel.width + kerf <= cut.x || x >= cut.x + cut.width + kerf ||
@@ -991,22 +999,16 @@ function packPanels(panels, stockOptions, grainMatters, kerf){
                 }
               }
               if(!conflict){
-                sheet.cuts.push({
-                  x, y, width: panel.width, height: panel.height,
-                  label: panel.label
-                });
-                sheet.placed.push(i);
-                placed = true;
-                fits = true;
-                break;
+                validPositions.push({x, y, width: panel.width, height: panel.height, label: panel.label, rotated: false});
+                break; // Take first valid position
               }
             }
-            if(placed) break;
+            if(validPositions.length > 0 && !validPositions[validPositions.length-1].rotated) break;
           }
         }
         
-        // Try rotated orientation if grain doesn't matter and normal didn't work
-        if(!fits && canRotate && panel.height + kerf <= sheet.stockWidth && panel.width + kerf <= sheet.stockHeight){
+        // Try rotated orientation if grain doesn't matter
+        if(canRotate && panel.height + kerf <= sheet.stockWidth && panel.width + kerf <= sheet.stockHeight){
           for(let y = kerf; y + panel.width + kerf <= sheet.stockHeight; y += 10){
             for(let x = kerf; x + panel.height + kerf <= sheet.stockWidth; x += 10){
               let conflict = false;
@@ -1018,27 +1020,77 @@ function packPanels(panels, stockOptions, grainMatters, kerf){
                 }
               }
               if(!conflict){
-                sheet.cuts.push({
-                  x, y, width: panel.height, height: panel.width,
-                  label: `${panel.label} (rotated)`
-                });
-                sheet.placed.push(i);
-                fits = true;
-                rotated = true;
-                break;
+                validPositions.push({x, y, width: panel.height, height: panel.width, label: `${panel.label} (rotated)`, rotated: true});
+                break; // Take first valid position
               }
             }
-            if(fits) break;
+            if(validPositions.length > 0 && validPositions[validPositions.length-1].rotated) break;
           }
         }
         
-        if(fits){
-          toRemove.push(i);
+        // Choose best position
+        // When grain doesn't matter and both orientations fit, try to choose the one that might allow more panels
+        let bestFit = null;
+        if(validPositions.length === 1){
+          bestFit = validPositions[0];
+        } else if(validPositions.length > 1){
+          // Both orientations fit - try to be smart about which to choose
+          // For now, try rotated if normal was already checked, or prefer rotated in some cases
+          // This helps when normal orientation blocks subsequent panels but rotated doesn't
+          if(canRotate){
+            // When grain doesn't matter, try both and see which position is better
+            // Simple heuristic: prefer rotated if it uses space differently, otherwise normal
+            const normalPos = validPositions.find(p => !p.rotated);
+            const rotatedPos = validPositions.find(p => p.rotated);
+            if(normalPos && rotatedPos){
+              // On first pass, prefer normal for consistency
+              // On second pass, prefer rotated to try different arrangements
+              if(passNumber === 0){
+                bestFit = normalPos;
+              } else {
+                bestFit = rotatedPos; // Second pass: try rotated to pack more
+              }
+            } else {
+              bestFit = normalPos || rotatedPos;
+            }
+          } else {
+            bestFit = validPositions[0];
+          }
         }
+        
+          // Place the panel if we found a fit
+          if(bestFit){
+            
+            sheet.cuts.push({
+              x: bestFit.x,
+              y: bestFit.y,
+              width: bestFit.width,
+              height: bestFit.height,
+              label: bestFit.label
+            });
+            sheet.placed.push(i);
+            passToRemove.push(i);
+            toRemove.push(i);
+          }
+        }
+        
+        // Remove placed panels from stockRemaining list (in reverse order to maintain indices)
+        passToRemove.sort((a,b)=>b-a).forEach(i => stockRemaining.splice(i, 1));
+        
+        passNumber++;
+        // If no panels were placed this pass, break
+        if(passToRemove.length === 0) break;
       }
       
-      // Remove placed panels from remaining list (in reverse order to maintain indices)
-      toRemove.sort((a,b)=>b-a).forEach(i => remaining.splice(i, 1));
+      // Remove placed panels from global remaining list by matching labels
+      const placedLabels = sheet.cuts.map(c => {
+        // Extract original label (remove " (rotated)" if present)
+        return c.label.replace(' (rotated)', '');
+      });
+      remaining = remaining.filter(p => {
+        const panelLabel = `Panel – ${p.opening} ${p.doorLabel}`;
+        return !placedLabels.includes(panelLabel);
+      });
       
       // Calculate waste
       const usedArea = sheet.cuts.reduce((sum, cut) => sum + (cut.width * cut.height), 0);
