@@ -205,3 +205,5 @@ This is a standalone HTML application. For issues or improvements:
 ## License
 
 This project is provided as-is for educational and practical use in cabinet making and woodworking projects.
+
+

@@ -45,7 +45,12 @@
   .door-diagram h4{margin:0 0 10px 0; color:#cbd5e1; font-size:14px}
   .unit-input{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center}
   .unit-display{font-size:11px; color:var(--muted); min-width:60px; text-align:right}
-  .door-svg{background:#0a0f1a; border-radius:8px; padding:10px}
+  .door-svg{background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; padding:10px}
+  .door-svg .door-outline{stroke:#2c3e50; stroke-width:2}
+  .door-svg .door-component{stroke:#34495e; stroke-width:1.5}
+  .door-svg .door-label{fill:#2c3e50; font-size:11px; font-weight:bold}
+  .door-svg .door-dimension{fill:#d35400; font-size:10px}
+  .door-svg .dimension-line{stroke:#d35400; stroke-width:1}
   .door-outline{fill:none; stroke:#22d3ee; stroke-width:2}
   .door-component{fill:none; stroke:#4ade80; stroke-width:1.5}
   .door-label{fill:#d1d5db; font-size:11px; font-weight:bold}
@@ -70,6 +75,9 @@
     .kerf{stroke:#888 !important}
     .door-diagram{page-break-inside:avoid; page-break-after:always; margin-bottom:30px; background:white !important}
     .door-svg{background:white !important}
+    .door-svg .door-outline{stroke:#000 !important}
+    .door-svg .dimension-line{stroke:#000 !important}
+    .door-svg .door-dimension{fill:#000 !important}
     .board{page-break-inside:avoid; background:white !important}
     table{page-break-inside:avoid; width:100%; margin-bottom:20px; background:white !important}
     tr{page-break-inside:avoid; background:white !important}
@@ -409,7 +417,7 @@ const DEFAULT_PARAMS = {
   existing8ft63:0,
   existing6ft89:0,
   existing8ft89:0,
-  panelStockOptions:'',
+  panelStockOptions:'609.6×1219.2 grain^',
   panelGrainMatters:'yes',
   panelKerf:3.2
 };
@@ -472,8 +480,43 @@ function updateInputFieldsFromParams(){
   $('#existing6ft89').value = params.existing6ft89;
   $('#existing8ft89').value = params.existing8ft89;
 
-  // Panel options
-  $('#panelStockOptions').value = params.panelStockOptions;
+  // Panel options - convert from mm to display units
+  const panelStockEl = $('#panelStockOptions');
+  if(panelStockEl && params.panelStockOptions){
+    // Parse and convert panel stock options from mm to display units
+    const parts = params.panelStockOptions.split(',');
+    const convertedParts = parts.map(part => {
+      part = part.trim();
+      if(!part) return '';
+      // Match: width×height grain^ or width×height grain→
+      const match = part.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*(grain\^|grain→)?/i);
+      if(match){
+        // Parse values as mm and convert to display units
+        let width = parseFloat(match[1]);
+        let height = parseFloat(match[2]);
+        // Values in params are stored in mm, convert to display units
+        if(units === 'in'){
+          width = width * (1 / mmPerInch);
+          height = height * (1 / mmPerInch);
+        }
+        const grain = match[3] || '';
+        return `${units === 'mm' ? Math.round(width) : width.toFixed(3)}×${units === 'mm' ? Math.round(height) : height.toFixed(3)}${grain ? ' ' + grain : ''}`;
+      }
+      return part;
+    });
+    panelStockEl.value = convertedParts.filter(p => p).join(', ');
+  } else if(panelStockEl && !params.panelStockOptions){
+    // Use default if empty
+    const defaultMm = '609.6×1219.2 grain^';
+    if(units === 'mm'){
+      panelStockEl.value = defaultMm;
+    } else {
+      // Convert default from mm to inches
+      const width = 609.6 * (1 / mmPerInch);
+      const height = 1219.2 * (1 / mmPerInch);
+      panelStockEl.value = `${width.toFixed(3)}×${height.toFixed(3)} grain^`;
+    }
+  }
   $('#panelGrainMatters').value = params.panelGrainMatters;
 
   // Units dropdown
@@ -740,7 +783,7 @@ function createDoorDiagram(opening){
   const panel=document.createElementNS('http://www.w3.org/2000/svg','rect');
   panel.setAttribute('x',panelX); panel.setAttribute('y',panelY);
   panel.setAttribute('width',panelW*scale); panel.setAttribute('height',panelH*scale);
-  panel.setAttribute('fill','none'); panel.setAttribute('stroke','#000000');
+  panel.setAttribute('fill','none'); panel.setAttribute('stroke','#2c3e50'); panel.setAttribute('class','door-outline');
   panel.setAttribute('stroke-width','2');
   svg.appendChild(panel);
   
@@ -748,7 +791,7 @@ function createDoorDiagram(opening){
   const leftStile=document.createElementNS('http://www.w3.org/2000/svg','rect');
   leftStile.setAttribute('x',leftStileX); leftStile.setAttribute('y',leftStileY);
   leftStile.setAttribute('width',Wst*scale); leftStile.setAttribute('height',DH*scale);
-  leftStile.setAttribute('fill','none'); leftStile.setAttribute('stroke','#000000');
+  leftStile.setAttribute('fill','none'); leftStile.setAttribute('stroke','#2c3e50'); leftStile.setAttribute('class','door-outline');
   leftStile.setAttribute('stroke-width','2');
   svg.appendChild(leftStile);
   
@@ -756,7 +799,7 @@ function createDoorDiagram(opening){
   const rightStile=document.createElementNS('http://www.w3.org/2000/svg','rect');
   rightStile.setAttribute('x',rightStileX); rightStile.setAttribute('y',rightStileY);
   rightStile.setAttribute('width',Wst*scale); rightStile.setAttribute('height',DH*scale);
-  rightStile.setAttribute('fill','none'); rightStile.setAttribute('stroke','#000000');
+  rightStile.setAttribute('fill','none'); rightStile.setAttribute('stroke','#2c3e50'); rightStile.setAttribute('class','door-outline');
   rightStile.setAttribute('stroke-width','2');
   svg.appendChild(rightStile);
   
@@ -764,7 +807,7 @@ function createDoorDiagram(opening){
   const topRail=document.createElementNS('http://www.w3.org/2000/svg','rect');
   topRail.setAttribute('x',topRailX); topRail.setAttribute('y',topRailY);
   topRail.setAttribute('width',railLenTop*scale); topRail.setAttribute('height',Wtop*scale);
-  topRail.setAttribute('fill','none'); topRail.setAttribute('stroke','#000000');
+  topRail.setAttribute('fill','none'); topRail.setAttribute('stroke','#2c3e50'); topRail.setAttribute('class','door-outline');
   topRail.setAttribute('stroke-width','2');
   svg.appendChild(topRail);
   
@@ -772,7 +815,7 @@ function createDoorDiagram(opening){
   const bottomRail=document.createElementNS('http://www.w3.org/2000/svg','rect');
   bottomRail.setAttribute('x',bottomRailX); bottomRail.setAttribute('y',bottomRailY);
   bottomRail.setAttribute('width',railLenBot*scale); bottomRail.setAttribute('height',Wbot*scale);
-  bottomRail.setAttribute('fill','none'); bottomRail.setAttribute('stroke','#000000');
+  bottomRail.setAttribute('fill','none'); bottomRail.setAttribute('stroke','#2c3e50'); bottomRail.setAttribute('class','door-outline');
   bottomRail.setAttribute('stroke-width','2');
   svg.appendChild(bottomRail);
   
@@ -818,7 +861,8 @@ function createDoorDiagram(opening){
         witness1.setAttribute('x1',dim.x1); witness1.setAttribute('y1',dim.y1 - 10);
         witness1.setAttribute('x2',dim.x1); witness1.setAttribute('y2',dim.y1);
       }
-      witness1.setAttribute('stroke','#000000'); witness1.setAttribute('stroke-width','1');
+      witness1.setAttribute('stroke','#34495e'); witness1.setAttribute('stroke-width','1');
+      witness1.setAttribute('class','dimension-line');
       svg.appendChild(witness1);
       
       const witness2=document.createElementNS('http://www.w3.org/2000/svg','line');
@@ -831,7 +875,8 @@ function createDoorDiagram(opening){
         witness2.setAttribute('x1',dim.x2); witness2.setAttribute('y1',dim.y2 + 10);
         witness2.setAttribute('x2',dim.x2); witness2.setAttribute('y2',dim.y2);
       }
-      witness2.setAttribute('stroke','#000000'); witness2.setAttribute('stroke-width','1');
+      witness2.setAttribute('stroke','#34495e'); witness2.setAttribute('stroke-width','1');
+      witness2.setAttribute('class','dimension-line');
       svg.appendChild(witness2);
     }
     
@@ -852,7 +897,8 @@ function createDoorDiagram(opening){
       dimLine1.setAttribute('x1',dim.x1); dimLine1.setAttribute('y1',dim.y1);
       dimLine1.setAttribute('x2',dim.x1 + (dim.x2 - dim.x1) * ratio1); dimLine1.setAttribute('y2',dim.y1);
     }
-    dimLine1.setAttribute('stroke','#000000'); dimLine1.setAttribute('stroke-width','1');
+    dimLine1.setAttribute('stroke','#d35400'); dimLine1.setAttribute('stroke-width','1');
+    dimLine1.setAttribute('class','dimension-line');
     svg.appendChild(dimLine1);
     
     // Second segment of dimension line
@@ -866,7 +912,8 @@ function createDoorDiagram(opening){
       dimLine2.setAttribute('x1',dim.x1 + (dim.x2 - dim.x1) * ratio2); dimLine2.setAttribute('y1',dim.y1);
       dimLine2.setAttribute('x2',dim.x2); dimLine2.setAttribute('y2',dim.y2);
     }
-    dimLine2.setAttribute('stroke','#000000'); dimLine2.setAttribute('stroke-width','1');
+    dimLine2.setAttribute('stroke','#d35400'); dimLine2.setAttribute('stroke-width','1');
+    dimLine2.setAttribute('class','dimension-line');
     svg.appendChild(dimLine2);
     
     // Dimension text
@@ -875,7 +922,7 @@ function createDoorDiagram(opening){
     dimText.setAttribute('class','door-dimension'); dimText.setAttribute('text-anchor','middle');
     dimText.setAttribute('dominant-baseline','middle');
     dimText.setAttribute('font-size','8px');
-    dimText.setAttribute('fill','#000000');
+    dimText.setAttribute('fill','#d35400');
     
     // Rotate text for vertical dimensions
     if(dim.vertical){
@@ -906,7 +953,8 @@ function createDoorDiagram(opening){
         arrow1.setAttribute('points',`${dim.x1-3},${dim.y1-2} ${dim.x1},${dim.y1} ${dim.x1-3},${dim.y1+2}`);
       }
     }
-    arrow1.setAttribute('fill','#000000');
+    arrow1.setAttribute('fill','#d35400');
+    arrow1.setAttribute('class','door-dimension');
     svg.appendChild(arrow1);
     
     const arrow2=document.createElementNS('http://www.w3.org/2000/svg','polygon');
@@ -929,7 +977,8 @@ function createDoorDiagram(opening){
         arrow2.setAttribute('points',`${dim.x2+3},${dim.y2-2} ${dim.x2},${dim.y2} ${dim.x2+3},${dim.y2+2}`);
       }
     }
-    arrow2.setAttribute('fill','#000000');
+    arrow2.setAttribute('fill','#d35400');
+    arrow2.setAttribute('class','door-dimension');
     svg.appendChild(arrow2);
   });
   
@@ -1139,7 +1188,7 @@ function extractPanels(cutList){
   return cutList.filter(c=>c.piece==='Panel').map(c => ({
     width: c.cutWidth,
     height: c.cutLength, // Panel height is stored as cutLength
-    label: `Panel – ${c.opening} ${c.doorLabel}`,
+    label: `${c.opening} ${c.doorLabel}`,
     opening: c.opening,
     doorLabel: c.doorLabel
   }));
@@ -1369,7 +1418,7 @@ function packPanels(panels, stockOptions, grainMatters, kerf){
         return c.label.replace(' (rotated)', '');
       });
       remaining = remaining.filter(p => {
-        const panelLabel = `Panel – ${p.opening} ${p.doorLabel}`;
+        const panelLabel = `${p.opening} ${p.doorLabel}`;
         return !placedLabels.includes(panelLabel);
       });
       
@@ -1604,22 +1653,30 @@ function renderPanelLayouts(packedPanels){
       h3.textContent=`Panel Sheet ${sheetIdx+1}: ${stock.label} — ${sheet.cuts.length} panel(s), ${sheet.efficiency}% efficient`;
       card.appendChild(h3);
       
-      const W=900,H=600,margin=20;
+      // Use consistent scale based on maximum panel size (48" × 96" = 1219.2mm × 2438.4mm)
+      // This ensures smaller panels take proportionally less space
+      const maxPanelWidth = 2438.4; // 96 inches in mm
+      const maxPanelHeight = 1219.2; // 48 inches in mm
+      const W=900,margin=20;
+      // Fixed scale factor - same for all panels regardless of actual size
+      const scale = (W - 2*margin) / maxPanelWidth;
+      // Height is also based on max panel height using same scale
+      const maxScaledHeight = maxPanelHeight * scale;
+      const H = maxScaledHeight + 2*margin;
+      
+      // Scale function uses fixed scale for all panels
+      const scaleX = (x) => x * scale;
+      
       const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-      const scaleX=W/(sheet.stockWidth+2*margin);
-      const scaleY=H/(sheet.stockHeight+2*margin);
-      const scale=Math.min(scaleX, scaleY);
-      const viewW=sheet.stockWidth*scale+2*margin;
-      const viewH=sheet.stockHeight*scale+2*margin;
-      svg.setAttribute('viewBox',`0 0 ${viewW} ${viewH}`);
+      svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
       svg.setAttribute('preserveAspectRatio','xMinYMin meet');
       svg.style.width='100%'; svg.style.height='auto';
       
-      // Stock sheet outline
+      // Stock sheet outline - uses fixed scale so smaller panels are smaller
       const stockRect=document.createElementNS('http://www.w3.org/2000/svg','rect');
       stockRect.setAttribute('x',margin); stockRect.setAttribute('y',margin);
-      stockRect.setAttribute('width',sheet.stockWidth*scale);
-      stockRect.setAttribute('height',sheet.stockHeight*scale);
+      stockRect.setAttribute('width',scaleX(sheet.stockWidth));
+      stockRect.setAttribute('height',scaleX(sheet.stockHeight));
       stockRect.setAttribute('fill','none');
       stockRect.setAttribute('stroke','#334155');
       stockRect.setAttribute('stroke-width','2');
@@ -1645,10 +1702,10 @@ function renderPanelLayouts(packedPanels){
       // Panel cuts
       sheet.cuts.forEach(cut=>{
         const cutRect=document.createElementNS('http://www.w3.org/2000/svg','rect');
-        cutRect.setAttribute('x',margin+cut.x*scale);
-        cutRect.setAttribute('y',margin+cut.y*scale);
-        cutRect.setAttribute('width',cut.width*scale);
-        cutRect.setAttribute('height',cut.height*scale);
+        cutRect.setAttribute('x',margin+scaleX(cut.x));
+        cutRect.setAttribute('y',margin+scaleX(cut.y));
+        cutRect.setAttribute('width',scaleX(cut.width));
+        cutRect.setAttribute('height',scaleX(cut.height));
         cutRect.setAttribute('fill','#22d3ee');
         cutRect.setAttribute('fill-opacity','0.3');
         cutRect.setAttribute('stroke','#22d3ee');
@@ -1656,8 +1713,8 @@ function renderPanelLayouts(packedPanels){
         svg.appendChild(cutRect);
         
         const label=document.createElementNS('http://www.w3.org/2000/svg','text');
-        label.setAttribute('x',margin+cut.x*scale+cut.width*scale/2);
-        label.setAttribute('y',margin+cut.y*scale+cut.height*scale/2);
+        label.setAttribute('x',margin+scaleX(cut.x)+scaleX(cut.width)/2);
+        label.setAttribute('y',margin+scaleX(cut.y)+scaleX(cut.height)/2);
         label.setAttribute('fill','#d1d5db');
         label.setAttribute('font-size','9px');
         label.setAttribute('text-anchor','middle');
@@ -1668,8 +1725,8 @@ function renderPanelLayouts(packedPanels){
         
         // Dimensions
         const dimText=document.createElementNS('http://www.w3.org/2000/svg','text');
-        dimText.setAttribute('x',margin+cut.x*scale+cut.width*scale/2);
-        dimText.setAttribute('y',margin+cut.y*scale+cut.height*scale/2+12);
+        dimText.setAttribute('x',margin+scaleX(cut.x)+scaleX(cut.width)/2);
+        dimText.setAttribute('y',margin+scaleX(cut.y)+scaleX(cut.height)/2+12);
         dimText.setAttribute('fill','#f59e0b');
         dimText.setAttribute('font-size','8px');
         dimText.setAttribute('text-anchor','middle');
@@ -1772,7 +1829,7 @@ function loadFromLocalStorage(){
       params.existing8ft63 = loaded.existing8ft63 || 0;
       params.existing6ft89 = loaded.existing6ft89 || 0;
       params.existing8ft89 = loaded.existing8ft89 || 0;
-      params.panelStockOptions = loaded.panelStockOptions || '';
+      params.panelStockOptions = loaded.panelStockOptions || '609.6×1219.2 grain^';
       params.panelGrainMatters = loaded.panelGrainMatters || 'yes';
       params.panelKerf = loaded.panelKerf || loaded.kerf || 3.2;
       
